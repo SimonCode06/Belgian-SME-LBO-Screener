@@ -167,7 +167,8 @@ def mechanische_assumpties(rij, bron):
 			"loonindexering": [aannames["indexering"] * 100] * JAREN,
 			"vte_elasticiteit": [config.LBO_VTE_ELASTICITEIT] * JAREN,
 			"inkoop_pct": [
-				_glide(inkoop_start, rij["Driver_Inkoop_Pct"] + aannames["inkoop_delta"] * 100, jaar)
+				# On a gross margin basis there is no purchases line to shift
+				_glide(inkoop_start, rij["Driver_Inkoop_Pct"] + (aannames["inkoop_delta"] * 100 if inkoop_start else 0.0), jaar)
 				for jaar in range(1, JAREN + 1)
 			],
 			"overige_kosten_pct": [
@@ -285,26 +286,23 @@ def controleer(pack, pack_jaren, omzet_0, personeel_0):
 	for scenario, sleutel, tekst in _volgorde_vlaggen(pack):
 		pack[scenario][sleutel]["vlaggen"].append(tekst)
 
+	# Derived checks: the flag sits next to the driver that moves the result most
+	for scenario in SCENARIOS:
+		groei, marges = impliciete_groei_en_marge(pack[scenario], omzet_0, personeel_0)
+		for reeks, grenzen, naam, sleutel in (
+			(groei, config.LBO_VLAG_OMZETGROEI, labels.DRIVER_REVENUE_GROWTH, "volumegroei"),
+			(marges, config.LBO_VLAG_EBITDA_MARGE, labels.DRIVER_EBITDA_MARGIN, "inkoop_pct"),
+		):
+			onder, boven = grenzen
+			jaren = [jaar for jaar, waarde in enumerate(reeks, start=1) if not onder <= waarde <= boven]
+			if jaren:
+				tekst = labels.ASSUMPTION_FLAG_BOUNDS.format(years=_jaren_tekst(jaren), low=onder, high=boven)
+				pack[scenario][sleutel]["vlaggen"].append(f"{naam}: {tekst}")
+
 	regels = []
 	for scenario in SCENARIOS:
 		label = config.LBO_SCENARIOS[scenario]["label"]
 		for driver in DRIVERS:
 			for vlag in pack[scenario][driver.sleutel]["vlaggen"]:
 				regels.append(f"{label} / {driver.label}: {vlag}")
-
-		groei, marges = impliciete_groei_en_marge(pack[scenario], omzet_0, personeel_0)
-		onder, boven = config.LBO_VLAG_OMZETGROEI
-		jaren = [jaar for jaar, waarde in enumerate(groei, start=1) if not onder <= waarde <= boven]
-		if jaren:
-			regels.append(
-				f"{label} / {labels.DRIVER_REVENUE_GROWTH}: "
-				+ labels.ASSUMPTION_FLAG_BOUNDS.format(years=_jaren_tekst(jaren), low=onder, high=boven)
-			)
-		onder, boven = config.LBO_VLAG_EBITDA_MARGE
-		jaren = [jaar for jaar, waarde in enumerate(marges, start=1) if not onder <= waarde <= boven]
-		if jaren:
-			regels.append(
-				f"{label} / {labels.DRIVER_EBITDA_MARGIN}: "
-				+ labels.ASSUMPTION_FLAG_BOUNDS.format(years=_jaren_tekst(jaren), low=onder, high=boven)
-			)
 	return regels

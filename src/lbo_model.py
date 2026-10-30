@@ -551,6 +551,7 @@ def bereken_lbo(rij, scenario="base"):
 				periode["Label"],
 				periode["Nr"],
 				Fractie=fractie,
+				Einde=periode["Einde"].isoformat(),
 				Omzet=omzet,
 				Omzetgroei_Pct=((1 + volume) * (1 + prijs) - 1) * 100,
 				Inkoop=inkoop,

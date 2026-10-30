@@ -240,6 +240,286 @@ COMPANY_FILE = "LBO_Model"
 UNKNOWN_COMPANY = "Unknown_Company"
 
 TAB_OVERVIEW = "Executive Summary"
+TAB_SUMMARY = "Executive Summary"
+TAB_MODEL = "3-Statement Model"
+TAB_LBO = "LBO Analysis"
+
+TITLE_MODEL = "3-STATEMENT MODEL"
+TITLE_LBO = "LBO ANALYSIS"
+TITLE_SUMMARY = "EXECUTIVE SUMMARY"
+SUBTITLE_SUMMARY = "Enterprise Number: {number}   |   Fiscal Year: {year}   |   Schema: {schema}   |   Assumptions: {source}"
+NO_PROJECTION = "No LBO projection possible: {reason}."
+
+CHECKS_TOTAL = "Model Integrity Checks"
+HEADER_LBO_YEAR = "LBO Year"
+HEADER_FISCAL_YEAR = "Fiscal Year"
+HEADER_ACTUAL = "Actual"
+HEADER_RATIONALE = "Rationale"
+HEADER_SOURCE = "Source"
+HEADER_CONFIDENCE = "Confidence"
+HEADER_FLAG = "Flag"
+HEADER_OVERRIDES = "Overrides"
+
+SCENARIO_SELECT = "Active Scenario"
+SCENARIO_INDEX = "Scenario Index"
+SCENARIO_LIST = "Scenarios"
+LEGEND = "Colour Code"
+LEGEND_INPUT = "Blue: hardcoded input, AI proposal, historical NBB value"
+LEGEND_FORMULA = "Black: formula"
+LEGEND_LINK = "Green: direct link to another tab"
+LEGEND_OVERRIDE = "Yellow: override cell, leave empty to keep the AI proposal"
+
+SECTION_SCENARIO = "SCENARIO SELECTOR"
+SECTION_TIMELINE = "TIMELINE"
+SECTION_AI = "ASSUMPTIONS: {scenario}"
+SECTION_ACTIVE = "ACTIVE ASSUMPTIONS"
+SECTION_BUILD = "OPERATING BUILD"
+SECTION_IS = "INCOME STATEMENT"
+SECTION_TAX = "INCOME TAX CALCULATION"
+SECTION_BS = "BALANCE SHEET"
+SECTION_CF = "CASH FLOW STATEMENT"
+SECTION_SCHEDULES = "FIXED ASSETS, GOODWILL AND FINANCING FEES"
+SECTION_CHECKS = "MODEL INTEGRITY CHECKS"
+SECTION_INPUTS = "TRANSACTION INPUTS"
+SECTION_BRIDGE = "EV-TO-EQUITY BRIDGE"
+SECTION_SU = "SOURCES & USES"
+SECTION_DEBT = "DEBT SCHEDULE"
+SECTION_INTEREST = "INTEREST"
+SECTION_WATERFALL = "CASH FLOW WATERFALL"
+SECTION_COVENANTS = "COVENANTS"
+SECTION_EXIT = "EXIT AND RETURNS"
+SECTION_DEFINITIONS = "NET DEBT DEFINITIONS"
+SECTION_KEY_METRICS = "KEY METRICS (ACTIVE SCENARIO)"
+SECTION_SCENARIOS = "KEY METRICS BY SCENARIO (AI CASE)"
+SECTION_TREND = "MULTI-YEAR OVERVIEW (ACTIVE SCENARIO)"
+SECTION_TEXT = "RED FLAGS AND QUALITATIVE ASSESSMENT"
+
+ROW_AI = "{driver}: AI Proposal"
+ROW_OVERRIDE = "{driver}: Override"
+ROW_USED = "{driver}: Used"
+
+STATUS_LABEL = "LBO Assessment"
+OVERRIDES_ACTIVE = "Overrides active"
+OVERRIDES_NOTE = "The assessment reflects the AI case and does not follow overrides."
+SCENARIO_NOTE = "Python results on the AI assumptions: these do not follow overrides."
+
+# Row labels of the workbook, by internal row key
+ROW_LABELS = {
+	"jaar_nr": "LBO Year Number",
+	"einde": "Period End",
+	"fractie": "Period Fraction",
+	"a_groei": "Revenue Growth",
+	"a_marge": "EBITDA Margin",
+	"rev_ann": "Annualized Revenue",
+	"pers_ann": "Annualized Personnel Costs",
+	"fte": "FTEs",
+	"kost_fte": "Cost per FTE (Annualized)",
+	"rev": "Revenue / Gross Margin",
+	"cogs": "Cost of Goods & Services",
+	"pers": "Personnel Costs",
+	"opex": "Other Operating Expenses",
+	"ebitda": "Adjusted EBITDA",
+	"da": "Depreciation & Amortization (D&A)",
+	"gw": "Goodwill Amortization",
+	"nonrec": "EBITDA Adjustments and Provisions (Non-recurring Items)",
+	"ebit": "EBIT",
+	"int_exp": "Interest Expense and Commitment Fee",
+	"fee_am": "Amortization of Financing Fees",
+	"int_inc": "Interest Income on Cash",
+	"fin_res": "Net Financial Result",
+	"ebt": "EBT",
+	"tax": "Income Tax",
+	"ni": "Net Income",
+	"fin_cost": "Financing Costs",
+	"deductible": "Deductible Financing Costs",
+	"taxable": "Taxable Income",
+	"tax_calc": "Income Tax Due",
+	"goodwill": "Goodwill",
+	"fin_fees": "Capitalized Financing Fees",
+	"ppe": "PP&E & Intangibles",
+	"fin_fa": "Financial Fixed Assets",
+	"inv": "Inventory",
+	"ar": "Trade Receivables",
+	"oth_op": "Other Assets (Operating)",
+	"oth_nonop": "Other Assets (Non-Operating: Group, Directors)",
+	"cash": "Cash & Cash Equivalents",
+	"ta": "Total Assets",
+	"equity": "Shareholders' Equity",
+	"exist_debt": "Existing Financial Debt",
+	"senior": "Senior Term Loan",
+	"rcf": "Revolving Credit Facility (RCF)",
+	"vendor": "Vendor Loan (Seller Note)",
+	"ap": "Trade Payables",
+	"adv": "Customer Advances",
+	"soc": "Accrued Payroll & Social Security",
+	"oth_l": "Other Liabilities",
+	"tl": "Total Liabilities & Equity",
+	"bs_check": "Balance Sheet Check",
+	"cf_ni": "Net Income",
+	"cf_da": "D&A",
+	"cf_gw": "Goodwill Amortization",
+	"cf_fee": "Amortization of Financing Fees",
+	"cf_inv": "Change in Inventory",
+	"cf_ar": "Change in Trade Receivables",
+	"cf_oth": "Change in Other Assets",
+	"cf_ap": "Change in Trade Payables",
+	"cf_adv": "Change in Customer Advances",
+	"cf_soc": "Change in Accrued Payroll & Social Security",
+	"cf_othl": "Change in Other Liabilities",
+	"cfo": "Cash Flow from Operations (CFO)",
+	"cf_capex": "Capex",
+	"cf_pre": "Cash Flow before Financing",
+	"cf_mand": "Mandatory Amortization",
+	"cf_sweep": "Cash Sweep",
+	"cf_draw": "RCF Drawdown",
+	"cf_repay": "RCF Repayment",
+	"cf_div": "Dividends",
+	"cff": "Cash Flow from Financing (CFF)",
+	"cf_net": "Net Change in Cash",
+	"cf_open": "Opening Cash",
+	"cf_end": "Closing Cash",
+	"capex": "Capex",
+	"rest": "Existing Assets: Remaining Book Value",
+	"da_exist": "D&A on Existing Assets",
+	"vintage": "D&A on Capex Vintage Year {year}",
+	"da_new": "D&A on New Capex",
+	"da_total": "Total D&A",
+	"gw_amort": "Goodwill Amortization",
+	"fee_amort": "Amortization of Financing Fees",
+	"check_cash": "Cash Ties: Cash Flow Statement vs Waterfall",
+	"check_debt": "Debt Ties: Rebuilt Tranches vs Balance Sheet",
+	"senior_rebuilt": "Senior Term Loan Rebuilt from Movements",
+	"rcf_rebuilt": "RCF Rebuilt from Movements",
+	"entry_ebitda": "Adjusted EBITDA (Entry)",
+	"entry_ev": "Entry EV",
+	"fin_debt": "Financial Debt",
+	"cash_br": "Cash & Cash Equivalents (excl. Treasury Shares)",
+	"debt_like": "Debt-Like Items",
+	"min_req": "Minimum Cash Requirement",
+	"min_cash": "Minimum Operating Cash",
+	"net_debt_0": "Net Debt (Bank Covenant Definition)",
+	"adj_nd": "Adjusted Net Debt",
+	"eq_price": "Equity Purchase Price",
+	"s_senior": "Senior Term Loan",
+	"s_vendor": "Vendor Loan (Seller Note)",
+	"s_rcf": "RCF Drawn at Closing",
+	"s_equity": "Sponsor Equity",
+	"s_total": "Total Sources",
+	"u_equity": "Equity Purchase Price",
+	"u_debt": "Settlement of Adjusted Net Debt",
+	"u_trans": "Transaction Fees",
+	"u_fin": "Financing Fees",
+	"u_total": "Total Uses",
+	"su_check": "Sources − Uses",
+	"goodwill_0": "Goodwill at Closing",
+	"rcf_limit": "RCF Limit",
+	"d_senior_open": "Senior Term Loan: Opening",
+	"d_mand": "Mandatory Amortization",
+	"d_sweep": "Cash Sweep",
+	"d_senior": "Senior Term Loan: Closing",
+	"d_rcf_open": "RCF: Opening",
+	"d_draw": "Drawdown",
+	"d_repay": "Repayment",
+	"d_rcf": "RCF: Closing",
+	"d_rcf_room": "RCF: Undrawn Headroom",
+	"d_vendor": "Vendor Loan: Closing (Bullet at Exit)",
+	"i_senior": "Interest Senior Term Loan",
+	"i_rcf": "Interest RCF",
+	"i_commit": "Commitment Fee RCF",
+	"i_vendor": "Interest Vendor Loan",
+	"i_total": "Total Cash Interest",
+	"i_income": "Interest Income on Cash",
+	"w_ebitda": "Adjusted EBITDA",
+	"w_tax": "Income Tax",
+	"w_capex": "Capex",
+	"w_twc": "Change in Net Working Capital (NWC)",
+	"w_oth": "Change in Other Working Capital",
+	"w_int": "Cash Interest and Commitment Fee",
+	"w_inc": "Interest Income on Cash",
+	"w_fcf": "Free Cash Flow (FCF)",
+	"w_mand": "Mandatory Amortization",
+	"w_ecf": "Excess Cash Flow (ECF)",
+	"w_open": "Opening Cash",
+	"w_pos": "Cash Position above Minimum",
+	"w_draw": "RCF Drawdown",
+	"w_repay": "RCF Repayment",
+	"w_sweep": "Cash Sweep",
+	"w_vrij": "Free Cash after Sweep",
+	"w_res": "Distributable Reserves (Before Dividend)",
+	"w_div": "Dividends",
+	"w_end": "Closing Cash per Waterfall",
+	"res_close": "Distributable Reserves (Closing)",
+	"c_icr": "Interest Coverage Ratio",
+	"c_icr_min": "Minimum Interest Coverage Ratio",
+	"c_icr_room": "Interest Coverage Headroom",
+	"c_dscr": "DSCR",
+	"c_dscr_min": "Minimum DSCR",
+	"c_dscr_room": "DSCR Headroom",
+	"c_lev": "Net Debt / EBITDA (Bank Covenant)",
+	"c_lev_max": "Maximum Net Debt / EBITDA",
+	"c_lev_room": "Leverage Headroom",
+	"c_status": "Covenant Test",
+	"nd_bank": "Net Debt (Bank Covenant)",
+	"nd_val": "Net Debt (Valuation)",
+	"x_ebitda": "Exit EBITDA",
+	"x_mult": "Exit Multiple",
+	"x_ev": "Exit EV",
+	"x_nd": "Exit Net Debt (Valuation)",
+	"x_equity": "Exit Equity",
+	"x_lev": "Exit Net Debt / EBITDA",
+	"x_flows": "Sponsor Cash Flows",
+	"x_dates": "Cash Flow Dates",
+	"x_irr": "IRR",
+	"x_moic": "MoIC",
+	"x_covenants": "Covenants",
+	"x_peak_lev": "Peak Net Debt / EBITDA",
+	"x_min_dscr": "Minimum DSCR",
+	"x_duration": "Holding Period (Years)",
+}
+
+INPUT_LABELS = {
+	"Entry_Multiple": "Entry Multiple (EV / EBITDA)",
+	"Exit_Multiple": "Exit Multiple (EV / EBITDA)",
+	"Senior_Multiple": "Senior Term Loan (x EBITDA)",
+	"Senior_Rate": "Senior Term Loan Interest Rate",
+	"Senior_Tenor": "Senior Term Loan Tenor (Years)",
+	"Cash_Sweep_Pct": "Cash Sweep (% of ECF)",
+	"Vendor_Pct_EV": "Vendor Loan (% of EV)",
+	"Vendor_Rate": "Vendor Loan Interest Rate",
+	"Transaction_Fee_Pct": "Transaction Fees (% of EV)",
+	"Financing_Fee_Pct": "Financing Fees (% of EV)",
+	"RCF_Limit_X": "RCF Limit (x EBITDA)",
+	"RCF_Rate": "RCF Interest Rate",
+	"RCF_Commitment_Fee": "RCF Commitment Fee (on Undrawn)",
+	"Cash_Rate": "Interest Rate on Cash",
+	"Dividend_Pct": "Dividend (% of Free Cash after Sweep)",
+	"Tax_Rate": "Corporate Income Tax Rate",
+	"SME_Rate_On": "Reduced SME Rate Applies (1 = yes)",
+	"SME_Rate": "Reduced SME Rate",
+	"SME_Bracket": "Reduced SME Rate Bracket",
+	"Interest_Deduct_From": "Interest Deductible from LBO Year",
+	"Interest_Cap_EUR": "Interest Limitation: Threshold",
+	"Interest_Cap_Pct": "Interest Limitation: % of EBITDA",
+	"Goodwill_Life": "Goodwill Amortization Period (Years)",
+	"Capex_Life": "Capex Useful Life (Years)",
+	"Min_DSCR": "Covenant: Minimum DSCR",
+	"Min_ICR": "Covenant: Minimum Interest Coverage Ratio",
+	"Max_Leverage": "Covenant: Maximum Net Debt / EBITDA",
+	"Target_Leverage": "Target Exit Net Debt / EBITDA",
+	"Days_Year": "Days per Year",
+	"Days_Week": "Days per Week",
+	"Months_Year": "Months per Year",
+	"Min_Cash_Months": "Minimum Cash: Months of Personnel Costs",
+	"Min_Cash_Weeks": "Minimum Cash: Weeks of Supplier Payments",
+	"Min_Cash_Term": "Minimum Cash: Supplier Payment Term (Days)",
+	"Goods_Basis": "Goods Cost Basis for DIO (% Revenue)",
+	"Purchases_Basis": "Purchases Basis for DPO (% Revenue)",
+	"Bank_Excess_Only": "Bank Covenant: Only Cash above Minimum (1 = yes)",
+	"Bank_Debt_Like": "Bank Covenant: Include Debt-Like Items (1 = yes)",
+	"Val_Excess_Only": "Valuation: Only Cash above Minimum (1 = yes)",
+	"Val_Debt_Like": "Valuation: Include Debt-Like Items (1 = yes)",
+	"Check_Tolerance": "Check Tolerance (EUR)",
+}
 TAB_DETAIL = "Full Data Detail"
 
 UNITS_NOTE = "EUR in thousands"

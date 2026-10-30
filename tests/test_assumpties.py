@@ -148,10 +148,11 @@ def test_days_use_the_days_tolerance(pack):
 	assert not pack["base"]["dso"]["vlaggen"]
 
 
-def test_ebitda_margin_outside_bounds_is_flagged(pack):
+def test_ebitda_margin_outside_bounds_is_flagged_next_to_the_assumption(pack):
 	pack["base"]["inkoop_pct"]["waarden"] = [99.0] * 5
 	regels = assumpties.controleer(pack, pack_jaren(), 10_000_000.0, 2_200_000.0)
 	assert any(labels.DRIVER_EBITDA_MARGIN in regel for regel in regels)
+	assert any(labels.DRIVER_EBITDA_MARGIN in vlag for vlag in pack["base"]["inkoop_pct"]["vlaggen"])
 
 
 def test_flags_reach_the_red_flags_and_the_model_uses_the_value_unchanged(cijfers, pack):
