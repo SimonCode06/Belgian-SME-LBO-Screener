@@ -12,7 +12,7 @@ naar de equity value voor de verkoper en naar de bediening van de nieuwe schuld.
 """
 import pandas as pd
 
-from . import config
+from . import config, labels
 from .lbo_model import bereken_scenarios, kies_multiples, net_debt
 
 NIET_BESCHIKBAAR = float("nan")  # verschijnt als lege cel in Excel, niet als 0%
@@ -39,41 +39,30 @@ def _zware_flags(rij):
     """Feiten die een sterke kwalificatie uitsluiten. De analist moet ze eerst beoordelen."""
     flags = []
     if rij["Eigen_Vermogen"] < 0:
-        flags.append(f"Negatief eigen vermogen (€ {rij['Eigen_Vermogen']:,.0f}): alarmbelprocedure WVV")
+        flags.append(labels.FLAG_NEGATIVE_EQUITY.format(value=rij["Eigen_Vermogen"]))
     if rij["Overgedragen_Resultaat"] < 0:
-        flags.append(f"Overgedragen verlies (€ {rij['Overgedragen_Resultaat']:,.0f})")
-    if rij["Commissaris_Oordeel"] in ("Met voorbehoud", "Onthoudend", "Afkeurend"):
-        flags.append(f"Verklaring commissaris: {rij['Commissaris_Oordeel'].lower()}")
-    if "vereffening" in rij["Cijfer_Flags"]:
-        flags.append("Vennootschap in vereffening")
+        flags.append(labels.FLAG_ACCUMULATED_LOSS.format(value=rij["Overgedragen_Resultaat"]))
+    if rij["Commissaris_Oordeel"] in labels.OPINIONS_HEAVY:
+        flags.append(labels.FLAG_AUDITOR.format(opinion=rij["Commissaris_Oordeel"]))
+    if labels.FLAG_LIQUIDATION in rij["Cijfer_Flags"]:
+        flags.append(labels.FLAG_LIQUIDATION)
     if rij["Memo_Vorderingen_Bestuurders"] > 0:
-        flags.append(
-            f"Vordering op bestuurders (€ {rij['Memo_Vorderingen_Bestuurders']:,.0f}): "
-            "leakage, bij closing terug te betalen"
-        )
+        flags.append(labels.FLAG_DIRECTOR_RECEIVABLE.format(value=rij["Memo_Vorderingen_Bestuurders"]))
     if rij["Balanstotaal"] > 0:
         groep_pct = rij["Memo_Vorderingen_Verbonden"] / rij["Balanstotaal"] * 100
         if groep_pct > config.MAX_GROEPSVORDERINGEN_PCT:
-            flags.append(
-                f"Vorderingen op verbonden ondernemingen (€ {rij['Memo_Vorderingen_Verbonden']:,.0f}, "
-                f"{groep_pct:.0f}% van de balans)"
-            )
+            flags.append(labels.FLAG_GROUP_RECEIVABLES.format(value=rij["Memo_Vorderingen_Verbonden"], pct=groep_pct))
     if rij["Driver_EBITDA_CAGR_Pct"] < 0 and rij["Driver_Omzetgroei_Pct"] > 0:
         flags.append(
-            f"Historische EBITDA daalt ({rij['Driver_EBITDA_CAGR_Pct']:+.1f}% per jaar) terwijl de forecast "
-            f"groeit ({rij['Driver_Omzetgroei_Pct']:+.1f}%): rendement is wellicht te hoog"
+            labels.FLAG_EBITDA_TREND.format(cagr=rij["Driver_EBITDA_CAGR_Pct"], growth=rij["Driver_Omzetgroei_Pct"])
         )
-    if rij["LBO_Downside_Convenanten"].startswith("GESCHONDEN"):
-        flags.append(f"Downside-scenario schendt de convenanten ({rij['LBO_Downside_Convenanten'][12:]})")
+    if rij["LBO_Downside_Convenanten"].startswith(labels.COVENANTS_BREACHED):
+        detail = rij["LBO_Downside_Convenanten"][len(labels.COVENANTS_BREACHED) + 2:]
+        flags.append(labels.FLAG_DOWNSIDE_COVENANTS.format(detail=detail))
     if rij["LBO_RCF_Eind"] > 0:
-        flags.append(
-            f"RCF nog € {rij['LBO_RCF_Eind']:,.0f} getrokken bij exit: het tekort is structureel, niet tijdelijk"
-        )
+        flags.append(labels.FLAG_RCF_AT_EXIT.format(value=rij["LBO_RCF_Eind"]))
     if rij["Memo_Zekerheden_Derden"] > max(rij["Genormaliseerde_EBITDA"], 0):
-        flags.append(
-            f"Zekerheden voor derden of de groep (€ {rij['Memo_Zekerheden_Derden']:,.0f}) "
-            "groter dan de EBITDA"
-        )
+        flags.append(labels.FLAG_THIRD_PARTY_GUARANTEES.format(value=rij["Memo_Zekerheden_Derden"]))
     return flags
 
 
@@ -144,7 +133,7 @@ def bouw_dataframe(resultaten):
 
     # Een marge op brutomarge is niet vergelijkbaar met een marge op omzet: dus twee kolommen.
     # De marge op brutomarge bestaat voor elk schema, die op omzet alleen als de omzet openbaar is.
-    heeft_omzet = df["Omzet_Basis"].str.startswith("Omzet")
+    heeft_omzet = df["Omzet_Basis"] == labels.BASIS_REVENUE
     df["EBITDA_Marge_Op_Omzet_Pct"] = df.apply(
         lambda r: _pct(r["Gerapporteerde_EBITDA"], r["Omzet_of_Brutomarge"]), axis=1
     ).where(heeft_omzet)
@@ -245,7 +234,7 @@ def bouw_dataframe(resultaten):
         df[veld] = [m[veld] for m in lbo_modellen]
     # Een fout in één scenario is een fout in het model, ook al is de base toevallig schoon
     df["LBO_Balanscheck"] = [
-        next((m["LBO_Balanscheck"] for m in modellen.values() if m["LBO_Balanscheck"] != "OK"), "OK")
+        next((m["LBO_Balanscheck"] for m in modellen.values() if m["LBO_Balanscheck"] != labels.CHECK_OK), labels.CHECK_OK)
         for modellen in scenario_modellen
     ]
     df["LBO_Downside_IRR_Pct"] = [m["downside"]["Indicatieve_IRR_Pct"] for m in scenario_modellen]
@@ -265,42 +254,33 @@ def bouw_dataframe(resultaten):
         extra_flags = [flag for flag in (rij["Zware_Flags"], rij["Cijfer_Flags"]) if flag]
 
         if rij["Trade_Working_Capital"] < 0:
-            extra_flags.append(f"Negatief trade working capital (€ {rij['Trade_Working_Capital']:,.0f})")
+            extra_flags.append(labels.FLAG_NEGATIVE_NWC.format(value=rij["Trade_Working_Capital"]))
 
         if rij["Minimum_Cash_Behoefte"] > rij["Liquide_Middelen"]:
             extra_flags.append(
-                f"Liquide middelen (€ {rij['Liquide_Middelen']:,.0f}) lager dan de minimum cash-behoefte "
-                f"(€ {rij['Minimum_Cash_Behoefte']:,.0f})"
+                labels.FLAG_LOW_CASH.format(cash=rij["Liquide_Middelen"], need=rij["Minimum_Cash_Behoefte"])
             )
 
         if rij["LBO_Cash_Onder_Minimum"] > 0:
-            extra_flags.append(
-                f"Cash zakt tot € {rij['LBO_Cash_Onder_Minimum']:,.0f} onder het minimum, ook na de RCF-trekking"
-            )
+            extra_flags.append(labels.FLAG_CASH_BELOW_MINIMUM.format(value=rij["LBO_Cash_Onder_Minimum"]))
 
         if rij["Omzet_of_Brutomarge_Vorig_Jaar"] > 0 and rij["Omzetgroei_Pct"] < 0:
-            extra_flags.append(f"Omzet-/brutomargekrimp ({rij['Omzetgroei_Pct']:+.1f}%)")
+            extra_flags.append(labels.FLAG_REVENUE_DECLINE.format(value=rij["Omzetgroei_Pct"]))
 
         if (
             rij["Omzet_of_Brutomarge_Vorig_Jaar"] > 0
             and rij["Marge_Verandering_pp"] < -config.MAX_MARGE_DALING_PP
         ):
-            extra_flags.append(
-                f"Sterke EBITDA-margedaling ({rij['Marge_Verandering_pp']:+.1f} pp)"
-            )
+            extra_flags.append(labels.FLAG_MARGIN_DECLINE.format(value=rij["Marge_Verandering_pp"]))
 
         if (
             rij["Genormaliseerde_EBITDA"] > 0
             and rij["LBO_Eind_Net_Debt_to_EBITDA"] >= config.LBO_TARGET_END_LEVERAGE
         ):
-            extra_flags.append(
-                f"LBO-schuld daalt binnen 5j niet onder 2,0x (eind: {rij['LBO_Eind_Net_Debt_to_EBITDA']:.2f}x)"
-            )
+            extra_flags.append(labels.FLAG_LEVERAGE_TARGET.format(value=rij["LBO_Eind_Net_Debt_to_EBITDA"]))
 
         if rij["LBO_RCF_Piek"] > 0:
-            extra_flags.append(
-                f"RCF nodig: piek € {rij['LBO_RCF_Piek']:,.0f} van limiet € {rij['LBO_RCF_Limiet']:,.0f}"
-            )
+            extra_flags.append(labels.FLAG_RCF_NEEDED.format(peak=rij["LBO_RCF_Piek"], limit=rij["LBO_RCF_Limiet"]))
 
         if extra_flags:
             prefix = "; ".join(extra_flags)
@@ -310,33 +290,33 @@ def bouw_dataframe(resultaten):
     df["Red_Flags"] = df.apply(verrijk_red_flags, axis=1)
 
     def bepaal_status(rij):
-        if rij["Check_Data"] != "OK":
-            return "CONTROLEER (Data klopt niet)"
-        if rij["LBO_Balanscheck"] == "FOUT":
-            return "CONTROLEER (Model sluit niet)"
-        if rij["Data_Volledigheid"].startswith("Onvoldoende"):
-            return "ONVOLDOENDE DATA"
+        if rij["Check_Data"] != labels.CHECK_OK:
+            return labels.STATUS_REVIEW_DATA
+        if rij["LBO_Balanscheck"] == labels.CHECK_ERROR:
+            return labels.STATUS_REVIEW_MODEL
+        if rij["Data_Volledigheid"].startswith(labels.DATA_INSUFFICIENT):
+            return labels.STATUS_INSUFFICIENT
         if rij["Genormaliseerde_EBITDA"] <= 0:
-            return "NO-GO (Negatieve/Geen EBITDA)"
+            return labels.STATUS_NO_GO_EBITDA
         if rij["Genormaliseerde_EBITDA"] < config.LBO_MIN_EBITDA:
-            return "NO-GO (Te klein voor een LBO)"
-        if rij["LBO_Convenanten"].startswith("N.V.T."):
-            return "ONVOLDOENDE DATA"
+            return labels.STATUS_NO_GO_SIZE
+        if rij["LBO_Convenanten"].startswith(labels.NOT_APPLICABLE):
+            return labels.STATUS_INSUFFICIENT
         if rij["Indicatieve_Equity_Value"] <= 0:
-            return f"NO-GO (Geen equity voor verkoper bij {rij['Instap_Multiple']}x)"
-        if rij["LBO_Convenanten"] != "OK" or rij["LBO_Laagste_Cash"] < 0:
-            return "NO-GO (Nieuwe schuld niet bedienbaar)"
+            return labels.STATUS_NO_GO_EQUITY.format(multiple=rij["Instap_Multiple"])
+        if rij["LBO_Convenanten"] != labels.COVENANTS_OK or rij["LBO_Laagste_Cash"] < 0:
+            return labels.STATUS_NO_GO_DEBT
         if rij["Indicatieve_IRR_Pct"] < 0:
-            return "NO-GO (Negatief rendement)"
+            return labels.STATUS_NO_GO_RETURN
         if rij["Zware_Flags"]:
-            return "MOGELIJKE KANDIDAAT (Zie red flags)"
+            return labels.STATUS_POSSIBLE_FLAGS
         if (
-            rij["Data_Volledigheid"] == "Volledig"
+            rij["Data_Volledigheid"] == labels.DATA_COMPLETE
             and rij["LBO_Eind_Net_Debt_to_EBITDA"] < config.LBO_TARGET_END_LEVERAGE
             and rij["Indicatieve_IRR_Pct"] >= config.LBO_MIN_IRR_PCT
         ):
-            return "STERKE LBO-KANDIDAAT"
-        return "MOGELIJKE KANDIDAAT (Check Cashflow)"
+            return labels.STATUS_STRONG
+        return labels.STATUS_POSSIBLE_CASHFLOW
 
     df["LBO_Status"] = df.apply(bepaal_status, axis=1)
 

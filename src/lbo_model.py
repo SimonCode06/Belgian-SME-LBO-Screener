@@ -30,7 +30,7 @@ overschot eerst naar de terugbetaling van de RCF, pas daarna naar de sweep en he
 import math
 from datetime import date
 
-from . import config
+from . import config, labels
 
 NIET_BESCHIKBAAR = float("nan")
 
@@ -89,9 +89,9 @@ def net_debt(doel, financiele_schuld, cash, minimum_cash, debt_like=0.0):
 def net_debt_formule(doel):
 	"""De definitie in woorden voor de Excel, afgeleid uit config zodat ze nooit afwijkt van de berekening."""
 	definitie = config.NET_DEBT_DEFINITIES[doel]
-	schuld = "financiële schuld + debt-like items" if definitie["debt_like_meetellen"] else "financiële schuld"
-	cash = "cash boven de minimum operationele cash" if definitie["alleen_cash_boven_minimum"] else "alle cash"
-	return f"{schuld} − {cash}. Gebruikt voor: {definitie['gebruik']}."
+	schuld = labels.NET_DEBT_FINANCIAL_DEBT_LIKE if definitie["debt_like_meetellen"] else labels.NET_DEBT_FINANCIAL
+	cash = labels.NET_DEBT_EXCESS_CASH if definitie["alleen_cash_boven_minimum"] else labels.NET_DEBT_ALL_CASH
+	return labels.NET_DEBT_USED_FOR.format(debt=schuld, cash=cash, use=definitie["gebruik"])
 
 
 def _geen_lbo(reden):
@@ -209,7 +209,7 @@ def _periodes(boekjaar_einde):
 				"Nr": nr,
 				"Fractie": deel,
 				"Boekjaar_Index": boekjaar + nr - 1,
-				"Label": f"{jaartal}F (stub)" if deel < 1 else f"{jaartal}F",
+				"Label": labels.period_label(jaartal, stub=deel < 1),
 			}
 		)
 	return closing, periodes
@@ -238,13 +238,13 @@ def _toets_convenanten(jaren):
 	breuken = []
 	for jaar in jaren[1:]:
 		if jaar["DSCR"] < config.LBO_COVENANT_MIN_DSCR:
-			breuken.append(f"J{jaar['Jaar']} DSCR {jaar['DSCR']:.2f}x")
+			breuken.append(labels.BREACH_DSCR.format(year=jaar["Jaar"], value=jaar["DSCR"]))
 		if jaar["Rentedekking"] < config.LBO_COVENANT_MIN_RENTEDEKKING:
-			breuken.append(f"J{jaar['Jaar']} rentedekking {jaar['Rentedekking']:.2f}x")
+			breuken.append(labels.BREACH_INTEREST.format(year=jaar["Jaar"], value=jaar["Rentedekking"]))
 		if jaar["Leverage"] > config.LBO_COVENANT_MAX_LEVERAGE:
-			breuken.append(f"J{jaar['Jaar']} leverage {jaar['Leverage']:.2f}x")
+			breuken.append(labels.BREACH_LEVERAGE.format(year=jaar["Jaar"], value=jaar["Leverage"]))
 		elif jaar["EBITDA"] <= 0:
-			breuken.append(f"J{jaar['Jaar']} EBITDA negatief")
+			breuken.append(labels.BREACH_EBITDA.format(year=jaar["Jaar"]))
 	return breuken
 
 
@@ -268,55 +268,35 @@ def _integriteitstesten(jaren, bronnen, bestedingen, minimum_cash):
 	laagste_schuld = min(min(jaar["Senior_Lening"], jaar["RCF"], jaar["Vendor_Loan"]) for jaar in jaren)
 	tekort = max(0.0, minimum_cash - min(jaar["Cash"] for jaar in forecast))
 
-	def test(naam, definitie, afwijking, tolerantie, soort="FOUT"):
+	def test(omschrijving, afwijking, tolerantie, soort=labels.CHECK_ERROR):
 		geslaagd = afwijking < tolerantie if tolerantie else afwijking == 0
 		return {
-			"Test": naam,
-			"Definitie": definitie,
+			"Test": omschrijving[0],
+			"Definitie": omschrijving[1],
 			"Afwijking": afwijking,
 			"Tolerantie": tolerantie,
-			"Uitkomst": "OK" if geslaagd else soort,
+			"Uitkomst": labels.CHECK_OK if geslaagd else soort,
 		}
 
 	return [
-		test(
-			"Balans sluit",
-			"Totaal activa − totaal passiva, per periode",
-			max(abs(jaar["Balansverschil"]) for jaar in jaren),
-			1,
-		),
-		test(
-			"Cash sluit",
-			"Eindcash kasstroomtabel = cash volgens de schuldwaterval",
-			max(abs(jaar["Cash"] - jaar["Cash_Waterval"]) for jaar in forecast),
-			1,
-		),
-		test("Schuld sluit", "Eindsaldo per tranche uit de mutaties = balans", afwijking_schuld, 1),
-		test(
-			"Eigen vermogen sluit",
-			"Begin + nettowinst − dividend + kapitaal = einde",
-			afwijking_eigen_vermogen,
-			1,
-		),
-		test("Bronnen = bestedingen", "Bij closing", abs(bronnen - bestedingen), 1),
-		test("Geen negatieve schuld", "Elke tranche ≥ 0", max(0.0, -laagste_schuld), 0),
-		test(
-			"Rente-iteratie geconvergeerd",
-			"Restverschil tussen de laatste twee iteraties",
-			max(jaar["Iteratie_Restverschil"] for jaar in forecast),
-			1,
-		),
-		test("Cash ≥ minimum", "Na RCF-trekking (flag, geen rekenfout)", tekort, 0, soort="FLAG"),
+		test(labels.TEST_BALANCE, max(abs(jaar["Balansverschil"]) for jaar in jaren), 1),
+		test(labels.TEST_CASH, max(abs(jaar["Cash"] - jaar["Cash_Waterval"]) for jaar in forecast), 1),
+		test(labels.TEST_DEBT, afwijking_schuld, 1),
+		test(labels.TEST_EQUITY, afwijking_eigen_vermogen, 1),
+		test(labels.TEST_SOURCES, abs(bronnen - bestedingen), 1),
+		test(labels.TEST_NEGATIVE_DEBT, max(0.0, -laagste_schuld), 0),
+		test(labels.TEST_ITERATION, max(jaar["Iteratie_Restverschil"] for jaar in forecast), 1),
+		test(labels.TEST_MINIMUM_CASH, tekort, 0, soort=labels.CHECK_FLAG),
 	]
 
 
 def bereken_lbo(rij, scenario="base"):
 	"""Rekent de LBO door voor één bedrijf en één scenario. Geeft de samenvatting, 'Jaren' en 'Integriteit' terug."""
 	if any(math.isnan(float(rij[veld])) for veld in VEREISTE_VELDEN):
-		return _geen_lbo("N.V.T. (Onvoldoende data)")
+		return _geen_lbo(labels.not_available(labels.REASON_INSUFFICIENT_DATA))
 	ebitda_0 = float(rij["Genormaliseerde_EBITDA"])
 	if ebitda_0 <= 0:
-		return _geen_lbo("N.V.T. (Geen EBITDA)")
+		return _geen_lbo(labels.not_available(labels.REASON_NO_EBITDA))
 
 	aannames = config.LBO_SCENARIOS[scenario]
 	groei = rij["Driver_Omzetgroei_Pct"] / 100
@@ -423,7 +403,7 @@ def bereken_lbo(rij, scenario="base"):
 	rest_bestaande_activa = vaste_activa_0
 	vintages = []  # [aankoopwaarde, nog af te schrijven]
 	closing, periodes = _periodes(rij["Boekjaar_Einde"])
-	jaren = [balans("Closing", 0)]
+	jaren = [balans(labels.LABEL_CLOSING, 0)]
 
 	# 3. Forecast: resultatenrekening, kasstroom, schuldschema en balans
 	for periode in periodes:
@@ -655,7 +635,7 @@ def bereken_lbo(rij, scenario="base"):
 
 	breuken = _toets_convenanten(jaren)
 	integriteit = _integriteitstesten(jaren, bronnen, bestedingen, minimum_cash)
-	balans_ok = not any(test["Uitkomst"] == "FOUT" for test in integriteit)
+	balans_ok = not any(test["Uitkomst"] == labels.CHECK_ERROR for test in integriteit)
 
 	return {
 		"LBO_Instap_EV": instap_ev,
@@ -674,7 +654,7 @@ def bereken_lbo(rij, scenario="base"):
 		"LBO_Eind_Net_Debt_Jaar5": eind_net_debt,
 		"LBO_Eind_Net_Debt_to_EBITDA": eind_leverage,
 		"LBO_Schuld_Onder_2x_5J": (
-			"JA (< 2,0x)" if eind_leverage < config.LBO_TARGET_END_LEVERAGE else f"NEE ({eind_leverage:.2f}x)"
+			labels.debt_target(eind_leverage < config.LBO_TARGET_END_LEVERAGE, eind_leverage)
 		),
 		"LBO_Laagste_DSCR": round(min(jaar["DSCR"] for jaar in forecast), 2),
 		"LBO_Laagste_Rentedekking": round(min(jaar["Rentedekking"] for jaar in forecast), 2),
@@ -684,8 +664,8 @@ def bereken_lbo(rij, scenario="base"):
 		"LBO_RCF_Limiet": rcf_limiet,
 		"LBO_RCF_Piek": max(jaar["RCF"] for jaar in forecast),
 		"LBO_RCF_Eind": rcf,
-		"LBO_Convenanten": "OK" if not breuken else "GESCHONDEN: " + "; ".join(breuken),
-		"LBO_Balanscheck": "OK" if balans_ok else "FOUT",
+		"LBO_Convenanten": labels.COVENANTS_OK if not breuken else labels.covenants_breached(breuken),
+		"LBO_Balanscheck": labels.CHECK_OK if balans_ok else labels.CHECK_ERROR,
 		"LBO_Exit_EV_Jaar5": exit_ev,
 		"LBO_Exit_Equity_Jaar5": exit_equity,
 		"Indicatieve_MoIC": moic,

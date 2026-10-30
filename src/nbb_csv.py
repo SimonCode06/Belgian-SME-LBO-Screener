@@ -17,7 +17,7 @@ import math
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-from . import config
+from . import config, labels
 
 NIET_BESCHIKBAAR = float("nan")
 
@@ -219,15 +219,15 @@ def groepeer_per_bedrijf(neerleggingen):
 
 def _controleer(neerlegging):
 	"""Rekent de neerlegging na op haar eigen totalen. Geeft een lijst met fouten."""
-	fouten = [f"code {code} ontbreekt" for code in VERPLICHTE_CODES if code not in neerlegging.codes]
+	fouten = [labels.ERROR_CODE_MISSING.format(code=code) for code in VERPLICHTE_CODES if code not in neerlegging.codes]
 	if neerlegging.valuta != "EUR":
-		fouten.append(f"valuta is {neerlegging.valuta}")
+		fouten.append(labels.ERROR_CURRENCY.format(currency=neerlegging.valuta))
 
 	for naam, totaal, onderdelen in OPBOUW:
 		if totaal in neerlegging.codes and neerlegging.regel_geldt(onderdelen):
 			if not neerlegging.sluit_aan(totaal, onderdelen):
 				verschil = neerlegging.bedrag(totaal) - neerlegging.bedrag(*onderdelen)
-				fouten.append(f"{naam} wijkt € {verschil:,.0f} af")
+				fouten.append(labels.ERROR_RECONCILIATION.format(name=labels.RECONCILIATION_NAMES[naam], value=verschil))
 	return fouten
 
 
@@ -235,20 +235,14 @@ def _signalen(neerlegging):
 	"""Feiten uit de neerlegging die een analist moet zien, maar geen rekenfout zijn."""
 	signalen = []
 	if neerlegging.maanden != 12:
-		signalen.append(
-			f"Boekjaar {neerlegging.boekjaar} telt {neerlegging.maanden} maanden: "
-			"resultaten omgerekend naar 12 maanden"
-		)
+		signalen.append(labels.SIGNAL_MONTHS.format(year=neerlegging.boekjaar, months=neerlegging.maanden))
 	if neerlegging.vereffening:
-		signalen.append("Vennootschap in vereffening")
+		signalen.append(labels.FLAG_LIQUIDATION)
 	if neerlegging.correctie:
-		signalen.append(f"Boekjaar {neerlegging.boekjaar} is een verbeterde neerlegging")
+		signalen.append(labels.SIGNAL_CORRECTED.format(year=neerlegging.boekjaar))
 	if "9077" in neerlegging.codes and not neerlegging.sluit_aan("454/9", ("9076", "9077")):
 		verschil = neerlegging.bedrag("454/9") - neerlegging.bedrag("9076", "9077")
-		signalen.append(
-			f"Boekjaar {neerlegging.boekjaar}: € {verschil:,.0f} van de sociale schulden (454/9) "
-			"staat niet in de toelichting (9076, 9077)"
-		)
+		signalen.append(labels.SIGNAL_SOCIAL_DEBT.format(year=neerlegging.boekjaar, value=verschil))
 	return signalen
 
 
@@ -317,11 +311,8 @@ def _normalisatie(neerlegging):
 
 def _normalisatie_toelichting(neerlegging):
 	if neerlegging.ontbrekend("66A", "76A"):
-		return "Eenmalige posten niet beschikbaar (codes 66A en 76A)."
-	return (
-		f"Eenmalige kosten (66A) € {neerlegging.bedrag('66A'):,.0f} teruggeteld, "
-		f"eenmalige opbrengsten (76A) € {neerlegging.bedrag('76A'):,.0f} verwijderd."
-	)
+		return labels.ADJUSTMENTS_UNAVAILABLE
+	return labels.ADJUSTMENTS_NOTE.format(expenses=neerlegging.bedrag("66A"), income=neerlegging.bedrag("76A"))
 
 
 def _liquide_middelen(neerlegging):
@@ -501,17 +492,17 @@ def _data_volledigheid(huidig, vorig, omzet_code, aantal_jaren):
 	]
 	ontbrekend = huidig.ontbrekend(omzet_code, "66A", "76A", *LIQUIDE_CODES, *kerncodes)
 	if math.isnan(_capex(huidig)):
-		ontbrekend.append("capex (staat van de vaste activa)")
+		ontbrekend.append(labels.COMPLETENESS_CAPEX)
 	if ontbrekend:
-		return f"Onvoldoende: geen gegevens voor {', '.join(ontbrekend)}"
+		return labels.data_insufficient(labels.COMPLETENESS_NO_DATA.format(codes=", ".join(ontbrekend)))
 	if vorig is None:
-		return "Gedeeltelijk: geen aansluitend vorig boekjaar"
+		return labels.data_partial(labels.COMPLETENESS_NO_PRIOR)
 	ontbrekend_vorig = vorig.ontbrekend(omzet_code, *EBITDA_CODES)
 	if ontbrekend_vorig:
-		return f"Gedeeltelijk: vorig boekjaar mist code {', '.join(ontbrekend_vorig)}"
+		return labels.data_partial(labels.COMPLETENESS_PRIOR_CODES.format(codes=", ".join(ontbrekend_vorig)))
 	if aantal_jaren < config.LBO_MIN_JAREN:
-		return f"Gedeeltelijk: {aantal_jaren} boekjaren, minstens {config.LBO_MIN_JAREN} nodig voor de drivers"
-	return "Volledig"
+		return labels.data_partial(labels.COMPLETENESS_FEW_YEARS.format(years=aantal_jaren, minimum=config.LBO_MIN_JAREN))
+	return labels.DATA_COMPLETE
 
 
 def _opmaak_nummer(nummer):
@@ -525,7 +516,7 @@ def bouw_cijfers(neerleggingen):
 
 	signalen = _signalen(huidig)
 	if vorig is None:
-		signalen.append(f"Geen aansluitende CSV voor het boekjaar vóór {huidig.boekjaar}: geen trend berekend")
+		signalen.append(labels.SIGNAL_NO_PRIOR_YEAR.format(year=huidig.boekjaar))
 	else:
 		signalen.extend(_signalen(vorig))
 
@@ -543,7 +534,7 @@ def bouw_cijfers(neerleggingen):
 		"Boekjaar_Maanden": huidig.maanden,
 		"Boekjaar_Maanden_Vorig_Jaar": vorig.maanden if vorig else NIET_BESCHIKBAAR,
 		"Schema_Type": huidig.schema,
-		"Omzet_Basis": "Omzet (code 70)" if omzet_code == "70" else "Brutomarge (code 9900)",
+		"Omzet_Basis": labels.BASIS_REVENUE if omzet_code == "70" else labels.BASIS_GROSS_MARGIN,
 		"Omzet_of_Brutomarge": huidig.per_jaar(omzet_code),
 		"Omzet_of_Brutomarge_Vorig_Jaar": vorig.per_jaar(omzet_code) if vorig else NIET_BESCHIKBAAR,
 		"Brutomarge": _brutomarge(huidig),
@@ -573,7 +564,7 @@ def bouw_cijfers(neerleggingen):
 		**_bereken_drivers(reeks, omzet_code),
 		**_openingsposten(huidig),
 		"Data_Volledigheid": _data_volledigheid(huidig, vorig, omzet_code, len(reeks)),
-		"Check_Data": "OK" if not fouten else "CONTROLEER: " + "; ".join(fouten),
+		"Check_Data": labels.CHECK_OK if not fouten else labels.check_review(fouten),
 		"Cijfer_Flags": "; ".join(signalen),
 		"Bronbestand": huidig.bestand,
 	}
@@ -599,7 +590,7 @@ def _modelregels(jaar, vorig, omzet_code):
 		return waarde / omzet * 100 if omzet > 0 else NIET_BESCHIKBAAR
 
 	return {
-		"Label": f"{jaar.boekjaar}A",
+		"Label": labels.actual_label(jaar.boekjaar),
 		"Omzet": omzet,
 		"Omzetgroei_Pct": (
 			(omzet / vorig.per_jaar(omzet_code) - 1) * 100

@@ -19,7 +19,7 @@ import time
 from google import genai
 from google.genai import types
 
-from src import config
+from src import config, labels
 from src.ai_extraction import analyseer_tekst, bouw_oordeel_prompt, bouw_prompt, schrijf_oordeel
 from src.calculations import bouw_dataframe
 from src.excel_export import schrijf_overzicht, schrijf_per_bedrijf
@@ -58,7 +58,7 @@ def maak_client():
 def geen_tekst(reden):
 	return {
 		"Normalisatie_Voorstellen": reden,
-		"Commissaris_Oordeel": "Onbekend",
+		"Commissaris_Oordeel": labels.OPINION_UNKNOWN,
 		"Buitenbalans_Verplichtingen": reden,
 		"Red_Flags": "",
 		"Kwalitatief_LBO_Oordeel": reden,
@@ -98,14 +98,13 @@ def koppel_tekst(cijfers, tekst):
 	pdf_nummer = re.sub(r"\D", "", str(tekst.get("Ondernemingsnummer", "")))
 	if pdf_nummer != cijfer_nummer:
 		return geen_tekst(
-			f"Tekst genegeerd: de PDF hoort bij ondernemingsnummer {pdf_nummer or 'onbekend'}, "
-			f"de cijfers bij {cijfer_nummer}."
+			labels.TEXT_WRONG_COMPANY.format(pdf=pdf_nummer or labels.TEXT_UNKNOWN, figures=cijfer_nummer)
 		)
 
 	velden = {k: v for k, v in tekst.items() if k not in ("Ondernemingsnummer", "Boekjaar")}
 	pdf_jaar = str(tekst.get("Boekjaar", ""))
 	if pdf_jaar != cijfers["Boekjaar"]:
-		signaal = f"PDF is van boekjaar {pdf_jaar or 'onbekend'}, de cijfers van {cijfers['Boekjaar']}"
+		signaal = labels.TEXT_WRONG_YEAR.format(pdf=pdf_jaar or labels.TEXT_UNKNOWN, figures=cijfers["Boekjaar"])
 		velden["Red_Flags"] = f"{signaal}; {velden.get('Red_Flags', '')}".strip("; ")
 	return velden
 
@@ -124,7 +123,7 @@ def voeg_oordelen_toe(df, client, mislukt):
 		if oordeel is not None:
 			print("   -> Toelichting uit cache")
 		elif client is None:
-			oordeel = {"Kwalitatief_LBO_Oordeel": "Geen toelichting: Gemini is niet beschikbaar."}
+			oordeel = {"Kwalitatief_LBO_Oordeel": labels.COMMENTARY_NO_GEMINI}
 		else:
 			try:
 				oordeel = schrijf_oordeel(client, rij)
@@ -132,9 +131,9 @@ def voeg_oordelen_toe(df, client, mislukt):
 				print(f"   -> Toelichting geschreven ({oordeel['Gebruikt_Model']})")
 			except Exception as fout:
 				print(f"   -> FOUT bij de toelichting van {rij['Bedrijfsnaam']}: {fout}")
-				oordeel = {"Kwalitatief_LBO_Oordeel": "Toelichting mislukt: run het script opnieuw."}
+				oordeel = {"Kwalitatief_LBO_Oordeel": labels.COMMENTARY_FAILED}
 				mislukt.append(f"toelichting {rij['Bedrijfsnaam']}")
-				if "API-sleutel geweigerd" in str(fout):
+				if labels.API_KEY_REFUSED in str(fout):
 					client = None
 
 			if client is not None and index + 1 < len(df):
@@ -179,7 +178,7 @@ def main():
 		pdf = zoek_pdf(bedrijf, pdf_per_naam)
 
 		if pdf is None:
-			tekst = geen_tekst("Geen PDF gevonden: geen tekstanalyse.")
+			tekst = geen_tekst(labels.TEXT_NO_PDF)
 			print("   -> Geen PDF gevonden, alleen cijfers")
 		else:
 			gebruikte_pdfs.add(pdf)
@@ -188,7 +187,7 @@ def main():
 			if tekst is not None:
 				print(f"   -> Tekst uit cache: {pdf.name}")
 			elif client is None:
-				tekst = geen_tekst("Geen tekstanalyse: Gemini is niet beschikbaar.")
+				tekst = geen_tekst(labels.TEXT_NO_GEMINI)
 			else:
 				try:
 					tekst = analyseer_tekst(client, pdf, cijfers)
@@ -196,9 +195,9 @@ def main():
 					print(f"   -> Tekst geanalyseerd ({tekst['Gebruikt_Model']}): {pdf.name}")
 				except Exception as fout:
 					print(f"   -> FOUT bij tekstanalyse van {pdf.name}: {fout}")
-					tekst = geen_tekst("Tekstanalyse mislukt: run het script opnieuw.")
+					tekst = geen_tekst(labels.TEXT_FAILED)
 					mislukt.append(pdf.name)
-					if "API-sleutel geweigerd" in str(fout):
+					if labels.API_KEY_REFUSED in str(fout):
 						client = None
 
 				if client is not None and i < len(bedrijven):

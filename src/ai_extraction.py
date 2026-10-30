@@ -17,7 +17,7 @@ import time
 
 from google.genai import errors, types
 
-from . import config
+from . import config, labels
 
 
 def parse_json_antwoord(tekst, sleutels):
@@ -58,7 +58,7 @@ def bouw_prompt(cijfers):
 	}
 	return (
 		f"{config.SYSTEEM_PROMPT}\n"
-		"Cijfers uit de NBB-neerlegging (in euro, definitief):\n"
+		"Figures from the NBB filing (in euro, final):\n"
 		f"{json.dumps(gegevens, ensure_ascii=False, indent=2)}\n"
 	)
 
@@ -71,7 +71,7 @@ def bouw_oordeel_prompt(rij):
 	}
 	return (
 		f"{config.OORDEEL_PROMPT}\n"
-		"Resultaten van het LBO-model (bedragen in euro):\n"
+		"Results of the LBO model (amounts in euro):\n"
 		f"{json.dumps(gegevens, ensure_ascii=False, indent=2, default=str)}\n"
 	)
 
@@ -103,7 +103,7 @@ def _vraag_gemini(client, contents, sleutels):
 					break
 				if code in (401, 403):
 					raise RuntimeError(
-						f"API-sleutel geweigerd ({code}). Controleer je sleutel/project."
+						f"{labels.API_KEY_REFUSED} ({code}). Check your key/project."
 					) from fout
 				if code not in config.RETRYABLE_CODES:
 					raise

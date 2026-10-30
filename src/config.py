@@ -15,6 +15,8 @@ INPUT_FOLDER = BASIS_MAP / "input_pdfs"  # NBB-CSV's (cijfers) en NBB-PDF's (tek
 CACHE_FOLDER = BASIS_MAP / "cache_json"
 OUTPUT_FOLDER = BASIS_MAP / "output"
 
+MODEL_VERSIE = "2.0"
+
 # ============================================================================
 # LBO- & Trend-parameters (Fase 1 t/m 4)
 # ============================================================================
@@ -77,15 +79,15 @@ LBO_SCENARIOS = {
 # Financiële schuld is altijd senior + RCF + vendor loan.
 NET_DEBT_DEFINITIES = {
 	"bank_covenant": {
-		"label": "bank-covenant",
-		"gebruik": "Leverage-convenant in de forecast en Net Debt (standaard) van de doelonderneming",
+		"label": "Bank Covenant",
+		"gebruik": "the leverage covenant in the forecast and the standard Net Debt of the target",
 		"alleen_cash_boven_minimum": False,
 		"debt_like_meetellen": False,
 	},
 	"waardering": {
 		# De debt-like items worden bij closing vereffend: in de forecast zijn ze 0
-		"label": "waardering",
-		"gebruik": "Adjusted Net Debt bij instap, exit equity en de doelstelling van 2,0x in jaar 5",
+		"label": "Valuation",
+		"gebruik": "Adjusted Net Debt at entry, exit equity and the 2.0x target in year 5",
 		"alleen_cash_boven_minimum": True,
 		"debt_like_meetellen": True,
 	},
@@ -144,44 +146,44 @@ INLINE_LIMIET_BYTES = 15 * 1024 * 1024  # groter => via Files API uploaden
 RETRYABLE_CODES = {429, 500, 502, 503, 504}
 
 SYSTEEM_PROMPT = """
-Je bent een ervaren Belgische M&A- en Private Equity-analist. Je krijgt een
-NBB-jaarrekening als PDF en de cijfers uit de gestructureerde neerlegging.
+You are an experienced Belgian M&A and Private Equity analyst. You receive an NBB
+annual report as a PDF and the figures from the structured filing. The PDF may be
+in Dutch or French. Always answer in English.
 
-Die cijfers zijn definitief. Haal geen bedragen opnieuw uit de financiële staten
-en bereken geen EBITDA, schuld of ratio's. De waarde null betekent dat het cijfer
-niet beschikbaar is: vul het niet zelf in. Jouw taak is alleen de tekst: de
-toelichtingen, waarderingsregels, het verslag van de commissaris, het
-jaarverslag en de buitenbalansverplichtingen.
+Those figures are final. Do not extract amounts from the financial statements again
+and do not calculate EBITDA, debt or ratios. The value null means the figure is not
+available: do not fill it in yourself. Your task is the text only: the notes, the
+valuation rules, the statutory auditor's report, the annual report and the
+off-balance-sheet commitments.
 
-Geef uitsluitend een geldig JSON-object terug met exact deze sleutels:
+Return only a valid JSON object with exactly these keys:
 {
-  "Ondernemingsnummer": "Ondernemingsnummer op de PDF, als 0xxx.xxx.xxx",
-  "Boekjaar": "Jaartal van de einddatum van het boekjaar op de PDF",
-  "Normalisatie_Voorstellen": "Mogelijke extra normalisaties",
-  "Commissaris_Oordeel": "Exact één van: Zonder voorbehoud, Met voorbehoud, Onthoudend, Afkeurend, Geen commissaris, Onbekend",
-  "Buitenbalans_Verplichtingen": "Verplichtingen die niet op de balans staan",
-  "Red_Flags": "Aandachtspunten uit de tekst"
+  "Ondernemingsnummer": "Enterprise number on the PDF, as 0xxx.xxx.xxx",
+  "Boekjaar": "Year of the end date of the fiscal year on the PDF",
+  "Normalisatie_Voorstellen": "Possible further EBITDA adjustments",
+  "Commissaris_Oordeel": "Exactly one of: Unqualified, Qualified, Disclaimer of Opinion, Adverse, No Statutory Auditor, Unknown",
+  "Buitenbalans_Verplichtingen": "Commitments not on the balance sheet",
+  "Red_Flags": "Points of attention from the text"
 }
 
-Instructies:
-- Normalisatie_Voorstellen: dit zijn de typische KMO-normalisaties. Benoem per
-  voorstel de post, het bedrag als dat in de PDF staat en de vindplaats (bijvoorbeeld
-  de rubriek over bestuurders of verbonden partijen). Denk aan de bezoldiging of
-  managementvergoeding van bestuurders ten opzichte van de markt, huur aan een
-  vastgoedvehikel van de eigenaar, privékosten en eenmalige posten die niet in
-  codes 66A en 76A staan. De codes 66A en 76A zijn al verwerkt: stel ze niet opnieuw
-  voor. Schrijf 'Geen' als er niets is. Deze voorstellen worden niet automatisch
-  in de EBITDA opgenomen; een analist beoordeelt ze.
-- Commissaris_Oordeel: het type verklaring in het verslag van de commissaris.
-  Een verklaring met een toelichting of benadrukking van een onzekerheid blijft
-  'Zonder voorbehoud'. Schrijf 'Geen commissaris' als er geen verslag is.
-- Buitenbalans_Verplichtingen: operationele leasing, huurverplichtingen,
-  borgstellingen, waarborgen en andere posten uit de rubriek 'niet in de balans
-  opgenomen rechten en verplichtingen', met bedrag. Schrijf 'Geen' als er niets is.
-- Red_Flags: denk aan vorderingen op en transacties met verbonden partijen en
-  bestuurders, een onzekere continuïteit, fusies of vereffening, geschillen en
-  afhankelijkheid van klanten of personen.
-- Noem alleen wat in de PDF staat. Verzin niets.
+Instructions:
+- Normalisatie_Voorstellen: the typical SME adjustments. For each proposal, name the
+  item, the amount if it is in the PDF and where it was found (for example the section
+  on directors or related parties). Think of director pay or management fees versus
+  market level, rent paid to a property vehicle of the owner, private expenses and
+  non-recurring items outside codes 66A and 76A. Codes 66A and 76A are already
+  processed: do not propose them again. Write 'None' if there is nothing. These
+  proposals are not added to EBITDA automatically; an analyst reviews them.
+- Commissaris_Oordeel: the type of opinion in the statutory auditor's report. An opinion
+  with an emphasis of matter or a stated uncertainty remains 'Unqualified'. Write
+  'No Statutory Auditor' if there is no report.
+- Buitenbalans_Verplichtingen: operating leases, rental commitments, guarantees and
+  other items from the section on rights and commitments not on the balance sheet,
+  with amounts. Write 'None' if there is nothing.
+- Red_Flags: think of receivables from and transactions with related parties and
+  directors, doubts about going concern, mergers or liquidation, disputes and
+  dependence on customers or individuals.
+- Mention only what is in the PDF. Do not invent anything.
 """
 
 VERWACHTE_SLEUTELS = [
@@ -195,23 +197,24 @@ VERWACHTE_SLEUTELS = [
 
 # Tweede pass: na de berekening licht Gemini de resultaten toe. Het oordeel staat al vast.
 OORDEEL_PROMPT = """
-Je bent een ervaren Belgische M&A- en Private Equity-analist. Het LBO-model is
-doorgerekend en je krijgt de resultaten plus de bevindingen uit de jaarrekening.
+You are an experienced Belgian M&A and Private Equity analyst. The LBO model has been
+run and you receive the results plus the findings from the annual report. Always
+answer in English.
 
-Geef uitsluitend een geldig JSON-object terug met exact deze sleutel:
+Return only a valid JSON object with exactly this key:
 {
-  "Kwalitatief_LBO_Oordeel": "Beknopte toelichting op het LBO-resultaat"
+  "Kwalitatief_LBO_Oordeel": "Concise commentary on the LBO result"
 }
 
-Instructies:
-- LBO_Status is de conclusie van het model. Licht die toe: spreek ze niet tegen en
-  vervang ze niet door een eigen conclusie.
-- Verklaar het resultaat vanuit de gegevens: kasstroomstabiliteit, meerjarentrend,
-  convenanten, leverage, gebruik van de RCF en rendement.
-- Een kwalitatief bezwaar dat het model niet meet, benoem je als aandachtspunt.
-- Gebruik alleen de gegeven cijfers. Bereken of schat er geen nieuwe. De waarde null
-  betekent dat het cijfer niet beschikbaar is.
-- Verzin niets.
+Instructions:
+- LBO_Status is the conclusion of the model. Explain it: do not contradict it and do
+  not replace it with a conclusion of your own.
+- Explain the result from the data: cash flow stability, multi-year trend, covenants,
+  leverage, use of the RCF and returns.
+- A qualitative concern the model does not measure is named as a point of attention.
+- Use only the figures provided. Do not calculate or estimate new ones. The value null
+  means the figure is not available.
+- Do not invent anything.
 """
 
 OORDEEL_SLEUTELS = ["Kwalitatief_LBO_Oordeel"]
