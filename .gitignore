@@ -1,0 +1,8 @@
+api_key.txt
+cache_json/
+input_pdfs/
+output/
+__pycache__/
+*.pyc
+.pytest_cache/
+~$*.xlsx

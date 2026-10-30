@@ -1,0 +1,489 @@
+"""Zet de cijfers uit de NBB-CSV's plus de AI-tekst (lijst van dicts) om in een berekend Pandas-DataFrame.
+
+Bevat de M&A-logica voor Fase 1 t/m 4:
+- Fase 1: EBITDA & normalisaties
+- Fase 2: Equity Bridge (Debt-Like Items, Adjusted Net Debt) & Trade Working Capital
+- Fase 3: Meerjarentrends (Omzetgroei %, EBITDA-groei %, Marge-evolutie in pp)
+- Fase 4: 3-statement LBO-model op drivers uit de NBB-cijfers (zie lbo_model.py)
+
+Een LBO gebeurt cash-free/debt-free: de bestaande schuld wordt geherfinancierd. Ze
+bepaalt dus wat de verkoper overhoudt, niet of de deal kan. Het oordeel kijkt daarom
+naar de equity value voor de verkoper en naar de bediening van de nieuwe schuld.
+"""
+import pandas as pd
+
+from . import config
+from .lbo_model import bereken_scenarios, kies_multiples, net_debt
+
+NIET_BESCHIKBAAR = float("nan")  # verschijnt als lege cel in Excel, niet als 0%
+
+# Alleen deze tekstvelden mogen ontbreken: elke andere ontbrekende kolom is een fout
+OPTIONELE_TEKSTKOLOMMEN = (
+    "Normalisatie_Voorstellen",
+    "Buitenbalans_Verplichtingen",
+    "Kwalitatief_LBO_Oordeel",
+    "Gebruikt_Model",
+)
+
+
+def _pct(teller, noemer):
+    return round(teller / noemer * 100, 2) if noemer > 0 else NIET_BESCHIKBAAR
+
+
+def _groei_pct(huidig, vorig):
+    """Op basis van abs(vorig), zodat een negatieve basis het teken niet omdraait."""
+    return round((huidig - vorig) / abs(vorig) * 100, 2) if vorig != 0 else NIET_BESCHIKBAAR
+
+
+def _zware_flags(rij):
+    """Feiten die een sterke kwalificatie uitsluiten. De analist moet ze eerst beoordelen."""
+    flags = []
+    if rij["Eigen_Vermogen"] < 0:
+        flags.append(f"Negatief eigen vermogen (€ {rij['Eigen_Vermogen']:,.0f}): alarmbelprocedure WVV")
+    if rij["Overgedragen_Resultaat"] < 0:
+        flags.append(f"Overgedragen verlies (€ {rij['Overgedragen_Resultaat']:,.0f})")
+    if rij["Commissaris_Oordeel"] in ("Met voorbehoud", "Onthoudend", "Afkeurend"):
+        flags.append(f"Verklaring commissaris: {rij['Commissaris_Oordeel'].lower()}")
+    if "vereffening" in rij["Cijfer_Flags"]:
+        flags.append("Vennootschap in vereffening")
+    if rij["Memo_Vorderingen_Bestuurders"] > 0:
+        flags.append(
+            f"Vordering op bestuurders (€ {rij['Memo_Vorderingen_Bestuurders']:,.0f}): "
+            "leakage, bij closing terug te betalen"
+        )
+    if rij["Balanstotaal"] > 0:
+        groep_pct = rij["Memo_Vorderingen_Verbonden"] / rij["Balanstotaal"] * 100
+        if groep_pct > config.MAX_GROEPSVORDERINGEN_PCT:
+            flags.append(
+                f"Vorderingen op verbonden ondernemingen (€ {rij['Memo_Vorderingen_Verbonden']:,.0f}, "
+                f"{groep_pct:.0f}% van de balans)"
+            )
+    if rij["Driver_EBITDA_CAGR_Pct"] < 0 and rij["Driver_Omzetgroei_Pct"] > 0:
+        flags.append(
+            f"Historische EBITDA daalt ({rij['Driver_EBITDA_CAGR_Pct']:+.1f}% per jaar) terwijl de forecast "
+            f"groeit ({rij['Driver_Omzetgroei_Pct']:+.1f}%): rendement is wellicht te hoog"
+        )
+    if rij["LBO_Downside_Convenanten"].startswith("GESCHONDEN"):
+        flags.append(f"Downside-scenario schendt de convenanten ({rij['LBO_Downside_Convenanten'][12:]})")
+    if rij["LBO_RCF_Eind"] > 0:
+        flags.append(
+            f"RCF nog € {rij['LBO_RCF_Eind']:,.0f} getrokken bij exit: het tekort is structureel, niet tijdelijk"
+        )
+    if rij["Memo_Zekerheden_Derden"] > max(rij["Genormaliseerde_EBITDA"], 0):
+        flags.append(
+            f"Zekerheden voor derden of de groep (€ {rij['Memo_Zekerheden_Derden']:,.0f}) "
+            "groter dan de EBITDA"
+        )
+    return flags
+
+
+def bouw_dataframe(resultaten):
+    df = pd.DataFrame(resultaten)
+
+    getal_kolommen = [
+        "Omzet_of_Brutomarge",
+        "Omzet_of_Brutomarge_Vorig_Jaar",
+        "Brutomarge",
+        "Brutomarge_Vorig_Jaar",
+        "Bedrijfswinst_EBIT",
+        "Bedrijfswinst_EBIT_Vorig_Jaar",
+        "Afschrijvingen",
+        "Afschrijvingen_Vorig_Jaar",
+        "Voorzieningen_Mutatie",
+        "Voorzieningen_Mutatie_Vorig_Jaar",
+        "Waardeverminderingen_Vlottend",
+        "Waardeverminderingen_Vlottend_Vorig_Jaar",
+        "Personeelskosten",
+        "Inkoop",
+        "VTE",
+        "Capex_Laatste_Jaar",
+        "Capex_Gemiddeld",
+        "Normalisatie_Bedrag",
+        "Financiele_Schulden_LT",
+        "Financiele_Schulden_KT",
+        "Voorzieningen_en_Uitgestelde_Belastingen",
+        "Belasting_en_Vervallen_RSZ_Schulden",
+        "Overige_Schulden_LT_en_KT",
+        "Liquide_Middelen",
+        "Eigen_Aandelen",
+        "Voorraden",
+        "Handelsvorderingen",
+        "Handelsschulden",
+        "Ontvangen_Vooruitbetalingen",
+        "Eigen_Vermogen",
+        "Balanstotaal",
+        "Overgedragen_Resultaat",
+        "Memo_Sociale_Schulden",
+        "Memo_Zekerheden_Derden",
+        "Memo_Vorderingen_Bestuurders",
+        "Memo_Vorderingen_Verbonden",
+    ]
+    # Vorig jaar is leeg (NaN) als er geen aansluitende CSV is, nooit 0
+    for kol in getal_kolommen:
+        df[kol] = pd.to_numeric(df[kol])
+
+    # Fase 1: EBITDA rekent Python zelf uit, nooit de AI. Waardeverminderingen (631/4) blijven
+    # een kost; voorzieningen (635/8) gaan terug omdat code 16 al debt-like is.
+    df["Gerapporteerde_EBITDA"] = (
+        df["Bedrijfswinst_EBIT"] + df["Afschrijvingen"] + df["Voorzieningen_Mutatie"]
+    )
+    df["Gerapporteerde_EBITDA_Vorig_Jaar"] = (
+        df["Bedrijfswinst_EBIT_Vorig_Jaar"]
+        + df["Afschrijvingen_Vorig_Jaar"]
+        + df["Voorzieningen_Mutatie_Vorig_Jaar"]
+    )
+    df["Genormaliseerde_EBITDA"] = df["Gerapporteerde_EBITDA"] + df["Normalisatie_Bedrag"]
+
+    # Fase 3: Meerjarentrends (groei en margestabiliteit)
+    df["Omzetgroei_Pct"] = df.apply(
+        lambda r: _groei_pct(r["Omzet_of_Brutomarge"], r["Omzet_of_Brutomarge_Vorig_Jaar"]), axis=1
+    )
+    df["EBITDA_Groei_Pct"] = df.apply(
+        lambda r: _groei_pct(r["Gerapporteerde_EBITDA"], r["Gerapporteerde_EBITDA_Vorig_Jaar"]), axis=1
+    )
+
+    # Een marge op brutomarge is niet vergelijkbaar met een marge op omzet: dus twee kolommen.
+    # De marge op brutomarge bestaat voor elk schema, die op omzet alleen als de omzet openbaar is.
+    heeft_omzet = df["Omzet_Basis"].str.startswith("Omzet")
+    df["EBITDA_Marge_Op_Omzet_Pct"] = df.apply(
+        lambda r: _pct(r["Gerapporteerde_EBITDA"], r["Omzet_of_Brutomarge"]), axis=1
+    ).where(heeft_omzet)
+    df["EBITDA_Marge_Op_Omzet_Vorig_Jaar_Pct"] = df.apply(
+        lambda r: _pct(r["Gerapporteerde_EBITDA_Vorig_Jaar"], r["Omzet_of_Brutomarge_Vorig_Jaar"]), axis=1
+    ).where(heeft_omzet)
+    df["EBITDA_Marge_Op_Brutomarge_Pct"] = df.apply(
+        lambda r: _pct(r["Gerapporteerde_EBITDA"], r["Brutomarge"]), axis=1
+    )
+    df["EBITDA_Marge_Op_Brutomarge_Vorig_Jaar_Pct"] = df.apply(
+        lambda r: _pct(r["Gerapporteerde_EBITDA_Vorig_Jaar"], r["Brutomarge_Vorig_Jaar"]), axis=1
+    )
+    df["Marge_Verandering_pp"] = (
+        (df["EBITDA_Marge_Op_Omzet_Pct"] - df["EBITDA_Marge_Op_Omzet_Vorig_Jaar_Pct"])
+        .where(heeft_omzet, df["EBITDA_Marge_Op_Brutomarge_Pct"] - df["EBITDA_Marge_Op_Brutomarge_Vorig_Jaar_Pct"])
+        .round(2)
+    )
+
+    # Fase 2: Equity Bridge & Trade Working Capital
+    df["Totale_Financiele_Schuld"] = df["Financiele_Schulden_LT"] + df["Financiele_Schulden_KT"]
+    df["Debt_Like_Items"] = (
+        df["Voorzieningen_en_Uitgestelde_Belastingen"]
+        + df["Belasting_en_Vervallen_RSZ_Schulden"]
+        + df["Overige_Schulden_LT_en_KT"]
+    )
+    # Cash die nodig is voor de bedrijfsvoering, is niet vrij en telt dus niet als aftrek.
+    # De behoefte hangt niet af van het schema: code 62 en 44 bestaan in elk schema.
+    df["Minimum_Cash_Behoefte"] = (
+        df["Personeelskosten"] * config.MIN_CASH_MAANDEN_PERSONEEL / 12
+        + df["Handelsschulden"] * config.MIN_CASH_WEKEN_LEVERANCIERS * 7 / config.MIN_CASH_BETAALTERMIJN_DAGEN
+    )
+    df["Minimum_Operationele_Cash"] = df["Minimum_Cash_Behoefte"].clip(lower=0, upper=df["Liquide_Middelen"])
+    df["Net_Debt"] = net_debt(
+        "bank_covenant", df["Totale_Financiele_Schuld"], df["Liquide_Middelen"], df["Minimum_Operationele_Cash"]
+    )
+    df["Adjusted_Net_Debt"] = net_debt(
+        "waardering",
+        df["Totale_Financiele_Schuld"],
+        df["Liquide_Middelen"],
+        df["Minimum_Operationele_Cash"],
+        df["Debt_Like_Items"],
+    )
+    df["Trade_Working_Capital"] = (
+        df["Voorraden"]
+        + df["Handelsvorderingen"]
+        - df["Handelsschulden"]
+        - df["Ontvangen_Vooruitbetalingen"]
+    )
+
+    # Bestaande schuldgraad is informatie: de schuld wordt bij een LBO geherfinancierd
+    df["Huidige_Net_Debt_to_EBITDA"] = df.apply(
+        lambda r: round(r["Adjusted_Net_Debt"] / r["Genormaliseerde_EBITDA"], 2)
+        if r["Genormaliseerde_EBITDA"] > 0
+        else NIET_BESCHIKBAAR,
+        axis=1,
+    )
+    multiples = df["Genormaliseerde_EBITDA"].apply(kies_multiples)
+    df["Instap_Multiple"] = [instap for instap, _ in multiples]
+    df["Senior_Multiple"] = [senior for _, senior in multiples]
+    df["Indicatieve_EV"] = df["Genormaliseerde_EBITDA"] * df["Instap_Multiple"]
+    df["Indicatieve_Equity_Value"] = df["Indicatieve_EV"] - df["Adjusted_Net_Debt"]
+
+    # Fase 4: 3-statement LBO-model
+    scenario_modellen = df.apply(bereken_scenarios, axis=1)
+    lbo_modellen = [modellen["base"] for modellen in scenario_modellen]
+    lbo_velden = [
+        "LBO_Instap_EV",
+        "LBO_Transactiekosten",
+        "LBO_Financieringskosten",
+        "LBO_Kosten",
+        "LBO_Senior_Schuld",
+        "LBO_Vendor_Loan",
+        "LBO_Sponsor_Equity_Instap",
+        "LBO_Closing_Datum",
+        "LBO_Duur_Jaren",
+        "LBO_EBITDA_Jaar5",
+        "LBO_EBITDA_Marge_Exit_Pct",
+        "LBO_FCF_Cumulatief_5J",
+        "LBO_Dividend_Cumulatief",
+        "LBO_Eind_Net_Debt_Jaar5",
+        "LBO_Eind_Net_Debt_to_EBITDA",
+        "LBO_Schuld_Onder_2x_5J",
+        "LBO_Laagste_DSCR",
+        "LBO_Laagste_Rentedekking",
+        "LBO_Hoogste_Leverage",
+        "LBO_Laagste_Cash",
+        "LBO_Cash_Onder_Minimum",
+        "LBO_RCF_Limiet",
+        "LBO_RCF_Piek",
+        "LBO_RCF_Eind",
+        "LBO_Convenanten",
+        "LBO_Exit_EV_Jaar5",
+        "LBO_Exit_Equity_Jaar5",
+        "Indicatieve_MoIC",
+        "Indicatieve_IRR_Pct",
+    ]
+    for veld in lbo_velden:
+        df[veld] = [m[veld] for m in lbo_modellen]
+    # Een fout in één scenario is een fout in het model, ook al is de base toevallig schoon
+    df["LBO_Balanscheck"] = [
+        next((m["LBO_Balanscheck"] for m in modellen.values() if m["LBO_Balanscheck"] != "OK"), "OK")
+        for modellen in scenario_modellen
+    ]
+    df["LBO_Downside_IRR_Pct"] = [m["downside"]["Indicatieve_IRR_Pct"] for m in scenario_modellen]
+    df["LBO_Downside_MoIC"] = [m["downside"]["Indicatieve_MoIC"] for m in scenario_modellen]
+    df["LBO_Downside_Convenanten"] = [m["downside"]["LBO_Convenanten"] for m in scenario_modellen]
+    df["LBO_Upside_IRR_Pct"] = [m["upside"]["Indicatieve_IRR_Pct"] for m in scenario_modellen]
+    # De export toont dit resultaat en rekent het model niet opnieuw door
+    df["LBO_Jaren"] = pd.Series([m["Jaren"] for m in lbo_modellen], index=df.index, dtype=object)
+    df["LBO_Integriteit"] = pd.Series([m["Integriteit"] for m in lbo_modellen], index=df.index, dtype=object)
+    df["LBO_Scenarios"] = pd.Series(list(scenario_modellen), index=df.index, dtype=object)
+
+    df["Zware_Flags"] = df.apply(lambda r: "; ".join(_zware_flags(r)), axis=1)
+
+    # Automatische Red Flags voor TWC (Fase 2), Trends (Fase 3) en Schuldaflossing (Fase 4)
+    def verrijk_red_flags(rij):
+        bestaande = str(rij.get("Red_Flags", "") or "").strip()
+        extra_flags = [flag for flag in (rij["Zware_Flags"], rij["Cijfer_Flags"]) if flag]
+
+        if rij["Trade_Working_Capital"] < 0:
+            extra_flags.append(f"Negatief trade working capital (€ {rij['Trade_Working_Capital']:,.0f})")
+
+        if rij["Minimum_Cash_Behoefte"] > rij["Liquide_Middelen"]:
+            extra_flags.append(
+                f"Liquide middelen (€ {rij['Liquide_Middelen']:,.0f}) lager dan de minimum cash-behoefte "
+                f"(€ {rij['Minimum_Cash_Behoefte']:,.0f})"
+            )
+
+        if rij["LBO_Cash_Onder_Minimum"] > 0:
+            extra_flags.append(
+                f"Cash zakt tot € {rij['LBO_Cash_Onder_Minimum']:,.0f} onder het minimum, ook na de RCF-trekking"
+            )
+
+        if rij["Omzet_of_Brutomarge_Vorig_Jaar"] > 0 and rij["Omzetgroei_Pct"] < 0:
+            extra_flags.append(f"Omzet-/brutomargekrimp ({rij['Omzetgroei_Pct']:+.1f}%)")
+
+        if (
+            rij["Omzet_of_Brutomarge_Vorig_Jaar"] > 0
+            and rij["Marge_Verandering_pp"] < -config.MAX_MARGE_DALING_PP
+        ):
+            extra_flags.append(
+                f"Sterke EBITDA-margedaling ({rij['Marge_Verandering_pp']:+.1f} pp)"
+            )
+
+        if (
+            rij["Genormaliseerde_EBITDA"] > 0
+            and rij["LBO_Eind_Net_Debt_to_EBITDA"] >= config.LBO_TARGET_END_LEVERAGE
+        ):
+            extra_flags.append(
+                f"LBO-schuld daalt binnen 5j niet onder 2,0x (eind: {rij['LBO_Eind_Net_Debt_to_EBITDA']:.2f}x)"
+            )
+
+        if rij["LBO_RCF_Piek"] > 0:
+            extra_flags.append(
+                f"RCF nodig: piek € {rij['LBO_RCF_Piek']:,.0f} van limiet € {rij['LBO_RCF_Limiet']:,.0f}"
+            )
+
+        if extra_flags:
+            prefix = "; ".join(extra_flags)
+            return f"{prefix}; {bestaande}" if bestaande else prefix
+        return bestaande
+
+    df["Red_Flags"] = df.apply(verrijk_red_flags, axis=1)
+
+    def bepaal_status(rij):
+        if rij["Check_Data"] != "OK":
+            return "CONTROLEER (Data klopt niet)"
+        if rij["LBO_Balanscheck"] == "FOUT":
+            return "CONTROLEER (Model sluit niet)"
+        if rij["Data_Volledigheid"].startswith("Onvoldoende"):
+            return "ONVOLDOENDE DATA"
+        if rij["Genormaliseerde_EBITDA"] <= 0:
+            return "NO-GO (Negatieve/Geen EBITDA)"
+        if rij["Genormaliseerde_EBITDA"] < config.LBO_MIN_EBITDA:
+            return "NO-GO (Te klein voor een LBO)"
+        if rij["LBO_Convenanten"].startswith("N.V.T."):
+            return "ONVOLDOENDE DATA"
+        if rij["Indicatieve_Equity_Value"] <= 0:
+            return f"NO-GO (Geen equity voor verkoper bij {rij['Instap_Multiple']}x)"
+        if rij["LBO_Convenanten"] != "OK" or rij["LBO_Laagste_Cash"] < 0:
+            return "NO-GO (Nieuwe schuld niet bedienbaar)"
+        if rij["Indicatieve_IRR_Pct"] < 0:
+            return "NO-GO (Negatief rendement)"
+        if rij["Zware_Flags"]:
+            return "MOGELIJKE KANDIDAAT (Zie red flags)"
+        if (
+            rij["Data_Volledigheid"] == "Volledig"
+            and rij["LBO_Eind_Net_Debt_to_EBITDA"] < config.LBO_TARGET_END_LEVERAGE
+            and rij["Indicatieve_IRR_Pct"] >= config.LBO_MIN_IRR_PCT
+        ):
+            return "STERKE LBO-KANDIDAAT"
+        return "MOGELIJKE KANDIDAAT (Check Cashflow)"
+
+    df["LBO_Status"] = df.apply(bepaal_status, axis=1)
+
+    volgorde = [
+        "Bedrijfsnaam",
+        "Ondernemingsnummer",
+        "Boekjaar",
+        "Boekjaar_Begin",
+        "Boekjaar_Einde",
+        "Boekjaar_Maanden",
+        "Boekjaar_Maanden_Vorig_Jaar",
+        "Schema_Type",
+        "LBO_Status",
+        "Data_Volledigheid",
+        "Omzet_Basis",
+        "Omzet_of_Brutomarge_Vorig_Jaar",
+        "Omzet_of_Brutomarge",
+        "Omzetgroei_Pct",
+        "Brutomarge_Vorig_Jaar",
+        "Brutomarge",
+        "Bedrijfswinst_EBIT_Vorig_Jaar",
+        "Bedrijfswinst_EBIT",
+        "Afschrijvingen_Vorig_Jaar",
+        "Afschrijvingen",
+        "Voorzieningen_Mutatie_Vorig_Jaar",
+        "Voorzieningen_Mutatie",
+        "Gerapporteerde_EBITDA_Vorig_Jaar",
+        "Gerapporteerde_EBITDA",
+        "EBITDA_Groei_Pct",
+        "Waardeverminderingen_Vlottend_Vorig_Jaar",
+        "Waardeverminderingen_Vlottend",
+        "Inkoop",
+        "Personeelskosten",
+        "VTE",
+        "Normalisatie_Bedrag",
+        "Genormaliseerde_EBITDA",
+        "EBITDA_Marge_Op_Omzet_Vorig_Jaar_Pct",
+        "EBITDA_Marge_Op_Omzet_Pct",
+        "EBITDA_Marge_Op_Brutomarge_Vorig_Jaar_Pct",
+        "EBITDA_Marge_Op_Brutomarge_Pct",
+        "Marge_Verandering_pp",
+        "Check_Data",
+        "Financiele_Schulden_LT",
+        "Financiele_Schulden_KT",
+        "Totale_Financiele_Schuld",
+        "Liquide_Middelen",
+        "Eigen_Aandelen",
+        "Net_Debt",
+        "Voorzieningen_en_Uitgestelde_Belastingen",
+        "Belasting_en_Vervallen_RSZ_Schulden",
+        "Overige_Schulden_LT_en_KT",
+        "Debt_Like_Items",
+        "Minimum_Cash_Behoefte",
+        "Minimum_Operationele_Cash",
+        "Adjusted_Net_Debt",
+        "Memo_Sociale_Schulden",
+        "Memo_Zekerheden_Derden",
+        "Memo_Vorderingen_Bestuurders",
+        "Memo_Vorderingen_Verbonden",
+        "Voorraden",
+        "Handelsvorderingen",
+        "Handelsschulden",
+        "Ontvangen_Vooruitbetalingen",
+        "Trade_Working_Capital",
+        "Capex_Laatste_Jaar",
+        "Capex_Gemiddeld",
+        "Capex_Aantal_Jaren",
+        "Huidige_Net_Debt_to_EBITDA",
+        "Driver_Aantal_Jaren",
+        "Driver_Historische_CAGR_Pct",
+        "Driver_Omzetgroei_Pct",
+        "Driver_EBITDA_CAGR_Pct",
+        "Driver_EBITDA_Marge_Gemiddeld_Pct",
+        "Driver_EBITDA_Marge_Pct",
+        "Driver_Inkoop_Pct",
+        "Driver_Overige_Kosten_Pct",
+        "Driver_DA_Pct_Vaste_Activa",
+        "Driver_Capex_Pct",
+        "Driver_DSO",
+        "Driver_DIO",
+        "Driver_DPO",
+        "Driver_Dagen_Vooruitbetaling",
+        "Driver_Kosten_60_Pct",
+        "Driver_Kosten_6061_Pct",
+        "Open_Vaste_Activa",
+        "Open_Financiele_Vaste_Activa",
+        "Open_Overige_Activa_Operationeel",
+        "Open_Overige_Activa_Niet_Operationeel",
+        "Open_Sociale_Schulden",
+        "Open_Overige_Passiva",
+        "Instap_Multiple",
+        "Senior_Multiple",
+        "Indicatieve_EV",
+        "Indicatieve_Equity_Value",
+        "LBO_Instap_EV",
+        "LBO_Transactiekosten",
+        "LBO_Financieringskosten",
+        "LBO_Kosten",
+        "LBO_Senior_Schuld",
+        "LBO_Vendor_Loan",
+        "LBO_Sponsor_Equity_Instap",
+        "LBO_Closing_Datum",
+        "LBO_Duur_Jaren",
+        "LBO_EBITDA_Jaar5",
+        "LBO_EBITDA_Marge_Exit_Pct",
+        "LBO_FCF_Cumulatief_5J",
+        "LBO_Dividend_Cumulatief",
+        "LBO_Eind_Net_Debt_Jaar5",
+        "LBO_Eind_Net_Debt_to_EBITDA",
+        "LBO_Schuld_Onder_2x_5J",
+        "LBO_Laagste_DSCR",
+        "LBO_Laagste_Rentedekking",
+        "LBO_Hoogste_Leverage",
+        "LBO_Laagste_Cash",
+        "LBO_Cash_Onder_Minimum",
+        "LBO_RCF_Limiet",
+        "LBO_RCF_Piek",
+        "LBO_RCF_Eind",
+        "LBO_Convenanten",
+        "LBO_Balanscheck",
+        "LBO_Exit_EV_Jaar5",
+        "LBO_Exit_Equity_Jaar5",
+        "Indicatieve_MoIC",
+        "Indicatieve_IRR_Pct",
+        "LBO_Downside_IRR_Pct",
+        "LBO_Downside_MoIC",
+        "LBO_Downside_Convenanten",
+        "LBO_Upside_IRR_Pct",
+        "LBO_Jaren",
+        "LBO_Integriteit",
+        "LBO_Scenarios",
+        "Eigen_Vermogen",
+        "Balanstotaal",
+        "Overgedragen_Resultaat",
+        "Normalisatie_Toelichting",
+        "Normalisatie_Voorstellen",
+        "Commissaris_Oordeel",
+        "Buitenbalans_Verplichtingen",
+        "Red_Flags",
+        "Kwalitatief_LBO_Oordeel",
+        "Bronbestand",
+        "Gebruikt_Model",
+    ]
+    for kol in OPTIONELE_TEKSTKOLOMMEN:
+        if kol not in df:
+            df[kol] = ""
+    ontbrekend = [kol for kol in volgorde if kol not in df]
+    if ontbrekend:
+        raise ValueError(f"Kolommen ontbreken in het resultaat: {', '.join(ontbrekend)}")
+    return df[volgorde]
