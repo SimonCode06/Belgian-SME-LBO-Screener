@@ -45,14 +45,15 @@ LBO_RCF_COMMITMENT_FEE = 0.01    # Jaarlijkse vergoeding op het niet-getrokken d
 LBO_TRANSACTIEKOSTEN_PCT = 0.03  # Advies, due diligence en notaris als deel van de EV
 LBO_FINANCIERINGSKOSTEN_PCT = 0.01  # Bankkosten als deel van de EV
 
-# Rente. Op het gemiddelde saldo ontstaat een kringverwijzing (rente -> kasstroom -> aflossing -> saldo),
-# die Python oplost met iteraties. "begin" rekent op het beginsaldo, zonder kringverwijzing.
-LBO_RENTE_BASIS = "gemiddeld"    # "gemiddeld" of "begin"
+# Rente. "begin" rekent op het openingssaldo, zonder kringverwijzing: dit is ook wat de Excel-formules doen.
+# "gemiddeld" lost de kringverwijzing op met iteraties, maar sluit dan niet meer op de Excel.
+LBO_RENTE_BASIS = "begin"        # "begin" of "gemiddeld"
 LBO_RENTE_ITERATIES = 10         # Iteraties bij een gemiddeld saldo
 LBO_CASH_RENTE = 0.015           # Interestopbrengst op de cash
 
 # Closing en exit. None: closing op de laatste balansdatum, zonder stub. Een datum ("2026-06-30") geeft een
-# stub tot het volgende boekjaareinde; de exit valt op het boekjaareinde het dichtst bij de holding period.
+# stub tot het volgende boekjaareinde, gevolgd door volle boekjaren: altijd vijf periodes, jaar 1 t/m 5.
+# Een datum later dan 12 maanden na de balansdatum wordt begrensd en krijgt een red flag.
 # De openingsbalans blijft de laatste jaarrekening: het model rolt de balans niet door tot de closing.
 LBO_CLOSING_DATUM = None
 
@@ -66,14 +67,20 @@ LBO_DIVIDEND_PCT = 0.0
 # Kostenstructuur: deel van de volumegroei dat extra VTE vraagt. Onder 1 ontstaat operationele hefboom.
 LBO_VTE_ELASTICITEIT = 0.75
 
-# Scenario's. Base: de omzetgroei uit de drivers is de totale groei, volume is wat na de prijsgroei overblijft.
-# volume_delta en inkoop_delta zijn afwijkingen op de base. De indexering volgt de wet en niet de klantprijs:
-# de prijs moet ze dus terugverdienen, anders krimpt de marge.
+# Mechanische scenario's: alleen voor de fallback (te weinig historiek of Gemini niet beschikbaar).
+# Base: de omzetgroei uit de drivers is de totale groei, volume is wat na de prijsgroei overblijft.
+# volume_delta en inkoop_delta zijn afwijkingen op de base.
 LBO_SCENARIOS = {
 	"base": {"label": "Base", "prijsgroei": 0.02, "volume_delta": 0.0, "indexering": 0.02, "inkoop_delta": 0.0},
 	"downside": {"label": "Downside", "prijsgroei": 0.01, "volume_delta": -0.02, "indexering": 0.025, "inkoop_delta": 0.0025},
 	"upside": {"label": "Upside", "prijsgroei": 0.025, "volume_delta": 0.01, "indexering": 0.02, "inkoop_delta": -0.0025},
 }
+
+# Zachte vlaggen op de AI-assumpties: ze waarschuwen en corrigeren nooit
+LBO_VLAG_OMZETGROEI = (-25.0, 25.0)   # Omzetgroei per jaar, in procentpunt
+LBO_VLAG_EBITDA_MARGE = (0.0, 60.0)   # EBITDA-marge per jaar, in procentpunt
+LBO_VLAG_MARGE_PP = 3.0               # Procentpunt buiten de historische min/max
+LBO_VLAG_MARGE_DAGEN = 15.0           # Dagen buiten de historische min/max (DSO, DIO, DPO, vooruitbetalingen)
 
 # Net debt: één definitie per doel, berekend door lbo_model.net_debt en beschreven in de Excel.
 # Financiële schuld is altijd senior + RCF + vendor loan.
@@ -110,6 +117,7 @@ LBO_RENTEAFTREK_DREMPEL_EUR = 3_000_000  # Renteaftrekbeperking: de hoogste van 
 LBO_RENTEAFTREK_EBITDA_PCT = 0.30        # ...en 30% van de EBITDA
 
 # Forecast
+DAGEN_PER_JAAR = 365            # Basis van DSO, DIO, DPO en vooruitbetalingen
 LBO_HOLDING_PERIOD_YEARS = 5     # Investeringshorizon van het PE-fonds (5 jaar)
 LBO_MIN_JAREN = 3                # Minder boekjaren: drivers zijn zwak, dus geen sterke kandidaat
 LBO_MAX_JAREN = 5                # Meer boekjaren gebruikt het model niet
@@ -185,6 +193,37 @@ Instructions:
   dependence on customers or individuals.
 - Mention only what is in the PDF. Do not invent anything.
 """
+
+ASSUMPTIE_PROMPT = """
+You are an experienced Belgian M&A and Private Equity analyst building the operating
+model of a leveraged buyout. You receive the annual report as a PDF and a driver pack
+with the historical ratios per fiscal year. The driver pack is final: do not recalculate
+it. The PDF may be in Dutch or French. Always answer in English.
+
+Propose the forecast assumptions for the five fiscal years after the last filed year,
+for three scenarios:
+- base: the most likely case, grounded in the historical trend and the outlook in the PDF.
+- downside: a credible setback a lender would underwrite, not a catastrophe.
+- upside: a credible outperformance, not a best case.
+
+Rules:
+- Return one row for every combination of scenario and driver: 36 rows in total.
+- Give exactly five values per row, for year 1 to 5, in the unit stated below.
+- A scenario must be coherent: price growth, volume, wage indexation and cost ratios
+  should tell one story for that scenario.
+- Downside must be no better than Base, and Base no better than Upside, in the
+  favourable direction of each driver.
+- Belgian wages are indexed by law, also when customers refuse price increases.
+- rationale: one or two sentences explaining the values, in English.
+- source: the PDF page plus a short quote, for example: p. 12: "new contract signed".
+  Write exactly "historical trend" if the value rests on the driver pack alone.
+- confidence: low, medium or high.
+- On a gross margin basis (Omzet_Basis in the driver pack) inkoop_pct must be 0 in every
+  year, because purchases are already deducted from the revenue line.
+- Do not invent facts about the company.
+"""
+
+ASSUMPTIE_BRON_HISTORIEK = "historical trend"
 
 VERWACHTE_SLEUTELS = [
 	"Ondernemingsnummer",

@@ -616,9 +616,16 @@ def _modelregels(jaar, vorig, omzet_code):
 		"Overige_Pct": pct(overige),
 		"EBITDA_Marge_Pct": pct(ebitda),
 		"Capex_Pct": pct(_capex(jaar)),
+		"DA_Pct": (
+			afschrijvingen / _vaste_activa(vorig) * 100
+			if vorig is not None and _vaste_activa(vorig) > 0
+			else NIET_BESCHIKBAAR
+		),
+		"Cash_Conversion_Pct": (ebitda - _capex(jaar)) / ebitda * 100 if ebitda > 0 else NIET_BESCHIKBAAR,
 		"DSO": dagen["DSO"],
 		"DIO": dagen["DIO"],
 		"DPO": dagen["DPO"],
+		"Advance_Days": _dagen(jaar.waarde("46"), omzet),
 		"Vaste_Activa": _vaste_activa(jaar),
 		"Financiele_Vaste_Activa": jaar.waarde("28"),
 		"Voorraden": jaar.waarde("3"),
@@ -634,6 +641,31 @@ def _modelregels(jaar, vorig, omzet_code):
 		"Sociale_Schulden": regels["sociaal"],
 		"Overige_Passiva": regels["overige_passiva"] - regels["sociaal"] + regels["debt_like"],
 		"Totaal_Passiva": jaar.waarde("10/49"),
+	}
+
+
+def bouw_driver_pack(neerleggingen):
+	"""The historical ratios per fiscal year for Gemini: fixed facts, not proposals."""
+	reeks = _aansluitende_jaren(neerleggingen)
+	omzet_code = _omzet_code(neerleggingen[-1])
+	velden = (
+		"Omzetgroei_Pct", "Inkoop_Pct", "Personeel_Pct", "Overige_Pct", "EBITDA_Marge_Pct", "VTE", "Kost_Per_VTE",
+		"Capex_Pct", "DA_Pct", "DSO", "DIO", "DPO", "Advance_Days", "Cash_Conversion_Pct",
+	)
+	jaren = []
+	for index, jaar in enumerate(reeks):
+		regels = _modelregels(jaar, reeks[index - 1] if index else None, omzet_code)
+		cijfers = {veld: regels[veld] for veld in velden}
+		jaren.append(
+			{
+				"Fiscal_Year": jaar.boekjaar,
+				**{veld: None if isinstance(waarde, float) and math.isnan(waarde) else waarde for veld, waarde in cijfers.items()},
+			}
+		)
+	return {
+		"Company": neerleggingen[-1].naam,
+		"Omzet_Basis": labels.BASIS_REVENUE if omzet_code == "70" else labels.BASIS_GROSS_MARGIN,
+		"Fiscal_Years": jaren,
 	}
 
 

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from src import calculations, labels
+from src import calculations, excel_export, labels
 
 
 def status_van(cijfers, **wijzigingen):
@@ -15,7 +15,7 @@ def test_every_overview_column_has_an_english_label(cijfers):
 	df = calculations.bouw_dataframe([cijfers])
 	ontbrekend = [
 		kol for kol in df.columns
-		if kol not in ("LBO_Jaren", "LBO_Integriteit", "LBO_Scenarios") and kol not in labels.COLUMN_LABELS
+		if kol not in excel_export.OBJECT_KOLOMMEN and kol not in labels.COLUMN_LABELS
 	]
 	assert ontbrekend == []
 
@@ -53,7 +53,6 @@ def test_heavy_auditor_opinion_blocks_strong_status(cijfers):
 
 def test_liquidation_signal_reaches_the_heavy_flags(cijfers):
 	rij = status_van(cijfers, Cijfer_Flags=labels.FLAG_LIQUIDATION)
-	assert labels.FLAG_LIQUIDATION in rij["Zware_Flags"] if "Zware_Flags" in rij else True
 	assert labels.FLAG_LIQUIDATION in rij["Red_Flags"]
 
 

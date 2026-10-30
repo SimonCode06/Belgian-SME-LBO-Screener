@@ -20,10 +20,18 @@ from google import genai
 from google.genai import types
 
 from src import config, labels
-from src.ai_extraction import analyseer_tekst, bouw_oordeel_prompt, bouw_prompt, schrijf_oordeel
+from src.ai_extraction import (
+	analyseer_tekst,
+	bouw_assumptie_prompt,
+	bouw_oordeel_prompt,
+	bouw_prompt,
+	genereer_assumpties,
+	schrijf_oordeel,
+)
+from src.assumpties import AssumptieAntwoord, pack_uit_antwoord
 from src.calculations import bouw_dataframe
 from src.excel_export import schrijf_overzicht, schrijf_per_bedrijf
-from src.nbb_csv import bouw_cijfers, bouw_meerjaren, groepeer_per_bedrijf, lees_neerlegging
+from src.nbb_csv import bouw_cijfers, bouw_driver_pack, bouw_meerjaren, groepeer_per_bedrijf, lees_neerlegging
 
 
 def naam_sleutel(naam):
@@ -76,6 +84,58 @@ def oordeel_cache_pad_voor(rij):
 	"""Andere resultaten, een andere prompt of modellijst geven een nieuwe toelichting."""
 	inhoud = ",".join(config.MODELLEN).encode("utf-8") + bouw_oordeel_prompt(rij).encode("utf-8")
 	return config.CACHE_FOLDER / f"oordeel_{naam_sleutel(rij['Bedrijfsnaam'])}_{hashlib.sha256(inhoud).hexdigest()[:16]}.json"
+
+
+def assumptie_cache_pad_voor(pdf, driver_pack):
+	"""A different PDF, prompt, schema, model list or driver pack gives new assumptions."""
+	inhoud = (
+		pdf.read_bytes()
+		+ ",".join(config.MODELLEN).encode("utf-8")
+		+ bouw_assumptie_prompt(driver_pack).encode("utf-8")
+		+ json.dumps(AssumptieAntwoord.model_json_schema(), sort_keys=True).encode("utf-8")
+	)
+	return config.CACHE_FOLDER / f"assumpties_{pdf.stem}_{hashlib.sha256(inhoud).hexdigest()[:16]}.json"
+
+
+def lees_assumptie_cache(pad):
+	"""A missing, broken or invalid cache file counts as no cache."""
+	try:
+		data = json.loads(pad.read_text(encoding="utf-8"))
+		return AssumptieAntwoord.model_validate(
+			{sleutel: waarde for sleutel, waarde in data.items() if sleutel != "Gebruikt_Model"}
+		)
+	except (OSError, ValueError):
+		return None
+
+
+def haal_assumpties(client, pdf, bedrijf, cijfers, mislukt):
+	"""AI assumptions if the history allows it. Returns (pack, source label, driver pack, model)."""
+	if cijfers["Driver_Aantal_Jaren"] < config.LBO_MIN_JAREN:
+		print("   -> Assumpties: te weinig historiek, mechanische drivers")
+		return None, labels.ASSUMPTIONS_FALLBACK_HISTORY, None, None
+	driver_pack = bouw_driver_pack(bedrijf)
+	if pdf is None:
+		return None, labels.ASSUMPTIONS_FALLBACK_NO_AI, driver_pack, None
+
+	cache_pad = assumptie_cache_pad_voor(pdf, driver_pack)
+	antwoord = lees_assumptie_cache(cache_pad)
+	if antwoord is not None:
+		print(f"   -> Assumpties uit cache: {pdf.name}")
+		data = json.loads(cache_pad.read_text(encoding="utf-8"))
+		return pack_uit_antwoord(antwoord), labels.ASSUMPTIONS_AI, driver_pack, data.get("Gebruikt_Model")
+	if client is None:
+		return None, labels.ASSUMPTIONS_FALLBACK_NO_AI, driver_pack, None
+
+	try:
+		data = genereer_assumpties(client, pdf, driver_pack)
+		cache_pad.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+		print(f"   -> Assumpties gegenereerd ({data['Gebruikt_Model']}): {pdf.name}")
+		antwoord = AssumptieAntwoord.model_validate({k: v for k, v in data.items() if k != "Gebruikt_Model"})
+		return pack_uit_antwoord(antwoord), labels.ASSUMPTIONS_AI, driver_pack, data["Gebruikt_Model"]
+	except Exception as fout:
+		print(f"   -> FOUT bij de assumpties van {pdf.name}: {fout}")
+		mislukt.append(f"assumpties {pdf.name}")
+		return None, labels.ASSUMPTIONS_FALLBACK_NO_AI, driver_pack, None
 
 
 def lees_cache(pad, sleutels=config.VERWACHTE_SLEUTELS):
@@ -203,7 +263,19 @@ def main():
 				if client is not None and i < len(bedrijven):
 					time.sleep(config.PAUZE_TUSSEN_PDFS_SEC)
 
-		resultaten.append({**cijfers, **koppel_tekst(cijfers, tekst)})
+		pack, bron, driver_pack, assumptie_model = haal_assumpties(client, pdf, bedrijf, cijfers, mislukt)
+		velden = koppel_tekst(cijfers, tekst)
+		if assumptie_model:
+			velden["Gebruikt_Model"] = assumptie_model
+		resultaten.append(
+			{
+				**cijfers,
+				**velden,
+				"LBO_Assumpties": pack,
+				"LBO_Assumptie_Bron": bron,
+				"LBO_Driver_Pack": driver_pack,
+			}
+		)
 
 	zonder_csv = [p.name for p in pdf_per_naam.values() if p not in gebruikte_pdfs]
 	if zonder_csv:

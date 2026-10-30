@@ -148,6 +148,8 @@ PCT_KOLOMMEN = {
 	"Indicatieve_IRR_Pct",
 	"LBO_Downside_IRR_Pct",
 	"LBO_Upside_IRR_Pct",
+	"LBO_IRR_Exact_Pct",
+	"LBO_Forecast_Groei_Pct",
 	"LBO_EBITDA_Marge_Exit_Pct",
 }
 DAGEN_KOLOMMEN = {"Driver_DSO", "Driver_DIO", "Driver_DPO", "Driver_Dagen_Vooruitbetaling"}
@@ -159,12 +161,13 @@ MULT_KOLOMMEN = {
 	"LBO_Laagste_Rentedekking",
 	"LBO_Hoogste_Leverage",
 	"LBO_Downside_MoIC",
+	"LBO_MoIC_Exact",
 	"Huidige_Net_Debt_to_EBITDA",
 	"LBO_Eind_Net_Debt_to_EBITDA",
 	"Indicatieve_MoIC",
 }
 GEEN_BEDRAG_KOLOMMEN = {"Boekjaar", "Boekjaar_Begin", "Boekjaar_Einde", "LBO_Closing_Datum", "Ondernemingsnummer"}
-OBJECT_KOLOMMEN = ["LBO_Jaren", "LBO_Integriteit", "LBO_Scenarios"]
+OBJECT_KOLOMMEN = ["LBO_Jaren", "LBO_Integriteit", "LBO_Scenarios", "LBO_Assumpties", "LBO_Assumptie_Vlaggen", "LBO_Driver_Pack"]
 
 
 def _schrijf_overzichtcel(ws, rij_nr, kolom_nr, kol_naam, rij, numeriek):

@@ -12,7 +12,7 @@ naar de equity value voor de verkoper en naar de bediening van de nieuwe schuld.
 """
 import pandas as pd
 
-from . import config, labels
+from . import assumpties, config, labels
 from .lbo_model import bereken_scenarios, kies_multiples, net_debt
 
 NIET_BESCHIKBAAR = float("nan")  # verschijnt als lege cel in Excel, niet als 0%
@@ -52,9 +52,9 @@ def _zware_flags(rij):
         groep_pct = rij["Memo_Vorderingen_Verbonden"] / rij["Balanstotaal"] * 100
         if groep_pct > config.MAX_GROEPSVORDERINGEN_PCT:
             flags.append(labels.FLAG_GROUP_RECEIVABLES.format(value=rij["Memo_Vorderingen_Verbonden"], pct=groep_pct))
-    if rij["Driver_EBITDA_CAGR_Pct"] < 0 and rij["Driver_Omzetgroei_Pct"] > 0:
+    if rij["Driver_EBITDA_CAGR_Pct"] < 0 and rij["LBO_Forecast_Groei_Pct"] > 0:
         flags.append(
-            labels.FLAG_EBITDA_TREND.format(cagr=rij["Driver_EBITDA_CAGR_Pct"], growth=rij["Driver_Omzetgroei_Pct"])
+            labels.FLAG_EBITDA_TREND.format(cagr=rij["Driver_EBITDA_CAGR_Pct"], growth=rij["LBO_Forecast_Groei_Pct"])
         )
     if rij["LBO_Downside_Convenanten"].startswith(labels.COVENANTS_BREACHED):
         detail = rij["LBO_Downside_Convenanten"][len(labels.COVENANTS_BREACHED) + 2:]
@@ -196,7 +196,34 @@ def bouw_dataframe(resultaten):
     df["Indicatieve_EV"] = df["Genormaliseerde_EBITDA"] * df["Instap_Multiple"]
     df["Indicatieve_Equity_Value"] = df["Indicatieve_EV"] - df["Adjusted_Net_Debt"]
 
-    # Fase 4: 3-statement LBO-model
+    # Fase 4: 3-statement LBO-model. De assumpties komen van Gemini of, zonder AI, uit de mechanische drivers.
+    if "LBO_Assumpties" not in df:
+        df["LBO_Assumpties"] = None
+    if "LBO_Assumptie_Bron" not in df:
+        df["LBO_Assumptie_Bron"] = labels.ASSUMPTIONS_FALLBACK_NO_AI
+    if "LBO_Driver_Pack" not in df:
+        df["LBO_Driver_Pack"] = None
+    df["LBO_Assumpties"] = pd.Series(
+        [
+            r["LBO_Assumpties"] if r["LBO_Assumpties"] is not None
+            else assumpties.mechanische_assumpties(r, r["LBO_Assumptie_Bron"])
+            for _, r in df.iterrows()
+        ],
+        index=df.index,
+        dtype=object,
+    )
+    df["LBO_Assumptie_Vlaggen"] = pd.Series(
+        [
+            assumpties.controleer(
+                r["LBO_Assumpties"], r["LBO_Driver_Pack"]["Fiscal_Years"], r["Omzet_of_Brutomarge"], r["Personeelskosten"]
+            )
+            if r["LBO_Driver_Pack"] is not None
+            else []
+            for _, r in df.iterrows()
+        ],
+        index=df.index,
+        dtype=object,
+    )
     scenario_modellen = df.apply(bereken_scenarios, axis=1)
     lbo_modellen = [modellen["base"] for modellen in scenario_modellen]
     lbo_velden = [
@@ -241,6 +268,12 @@ def bouw_dataframe(resultaten):
     df["LBO_Downside_MoIC"] = [m["downside"]["Indicatieve_MoIC"] for m in scenario_modellen]
     df["LBO_Downside_Convenanten"] = [m["downside"]["LBO_Convenanten"] for m in scenario_modellen]
     df["LBO_Upside_IRR_Pct"] = [m["upside"]["Indicatieve_IRR_Pct"] for m in scenario_modellen]
+    df["LBO_IRR_Exact_Pct"] = [m["LBO_IRR_Exact_Pct"] for m in lbo_modellen]
+    df["LBO_MoIC_Exact"] = [m["LBO_MoIC_Exact"] for m in lbo_modellen]
+    df["LBO_Forecast_Groei_Pct"] = [
+        ((m["Jaren"][-1]["Omzet"] / r) ** (1 / m["LBO_Duur_Jaren"]) - 1) * 100 if m["Jaren"] and r > 0 else NIET_BESCHIKBAAR
+        for m, r in zip(lbo_modellen, df["Omzet_of_Brutomarge"])
+    ]
     # De export toont dit resultaat en rekent het model niet opnieuw door
     df["LBO_Jaren"] = pd.Series([m["Jaren"] for m in lbo_modellen], index=df.index, dtype=object)
     df["LBO_Integriteit"] = pd.Series([m["Integriteit"] for m in lbo_modellen], index=df.index, dtype=object)
@@ -260,6 +293,11 @@ def bouw_dataframe(resultaten):
             extra_flags.append(
                 labels.FLAG_LOW_CASH.format(cash=rij["Liquide_Middelen"], need=rij["Minimum_Cash_Behoefte"])
             )
+
+        extra_flags.extend(labels.FLAG_ASSUMPTIONS.format(detail=vlag) for vlag in rij["LBO_Assumptie_Vlaggen"])
+
+        if config.LBO_CLOSING_DATUM and rij["LBO_Closing_Datum"] and rij["LBO_Closing_Datum"] < config.LBO_CLOSING_DATUM:
+            extra_flags.append(labels.FLAG_CLOSING_LIMITED.format(date=rij["LBO_Closing_Datum"]))
 
         if rij["LBO_Cash_Onder_Minimum"] > 0:
             extra_flags.append(labels.FLAG_CASH_BELOW_MINIMUM.format(value=rij["LBO_Cash_Onder_Minimum"]))
@@ -445,6 +483,13 @@ def bouw_dataframe(resultaten):
         "LBO_Downside_MoIC",
         "LBO_Downside_Convenanten",
         "LBO_Upside_IRR_Pct",
+        "LBO_IRR_Exact_Pct",
+        "LBO_MoIC_Exact",
+        "LBO_Forecast_Groei_Pct",
+        "LBO_Assumptie_Bron",
+        "LBO_Assumpties",
+        "LBO_Assumptie_Vlaggen",
+        "LBO_Driver_Pack",
         "LBO_Jaren",
         "LBO_Integriteit",
         "LBO_Scenarios",

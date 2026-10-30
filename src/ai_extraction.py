@@ -18,6 +18,7 @@ import time
 from google.genai import errors, types
 
 from . import config, labels
+from .assumpties import AssumptieAntwoord, driver_uitleg
 
 
 def parse_json_antwoord(tekst, sleutels):
@@ -76,10 +77,23 @@ def bouw_oordeel_prompt(rij):
 	)
 
 
-def _vraag_gemini(client, contents, sleutels):
-	"""Probeert elk model in config.MODELLEN af met backoff. Geeft een dict met de gevraagde sleutels terug."""
+def bouw_assumptie_prompt(driver_pack):
+	"""The instructions for the forecast assumptions plus the driver pack as fixed facts."""
+	return (
+		f"{config.ASSUMPTIE_PROMPT}\n"
+		f"Drivers:\n{driver_uitleg()}\n\n"
+		"Driver pack (historical ratios per fiscal year, final):\n"
+		f"{json.dumps(driver_pack, ensure_ascii=False, indent=2, default=str)}\n"
+	)
+
+
+def _vraag_gemini(client, contents, sleutels, schema=None, temperatuur=0.1):
+	"""Probeert elk model in config.MODELLEN af met backoff.
+
+	Met een schema dwingt Gemini de structuur af en wordt het antwoord met Pydantic gevalideerd.
+	"""
 	generatie_config = types.GenerateContentConfig(
-		response_mime_type="application/json", temperature=0.1
+		response_mime_type="application/json", temperature=temperatuur, response_schema=schema
 	)
 	laatste_fout = None
 	for model in config.MODELLEN:
@@ -90,7 +104,10 @@ def _vraag_gemini(client, contents, sleutels):
 					contents=contents,
 					config=generatie_config,
 				)
-				data = parse_json_antwoord(response.text, sleutels)
+				if schema is not None:
+					data = schema.model_validate_json(response.text).model_dump()
+				else:
+					data = parse_json_antwoord(response.text, sleutels)
 				data["Gebruikt_Model"] = model
 				return data
 
@@ -136,6 +153,25 @@ def analyseer_tekst(client, pdf_pad, cijfers):
 	pdf_deel, upload_naam = bouw_pdf_part(client, pdf_pad)
 	try:
 		return _vraag_gemini(client, [pdf_deel, bouw_prompt(cijfers)], config.VERWACHTE_SLEUTELS)
+	finally:
+		if upload_naam:
+			try:
+				client.files.delete(name=upload_naam)
+			except Exception:
+				pass
+
+
+def genereer_assumpties(client, pdf_pad, driver_pack):
+	"""Forecast assumptions per driver, scenario and year, from the PDF and the driver pack."""
+	pdf_deel, upload_naam = bouw_pdf_part(client, pdf_pad)
+	try:
+		return _vraag_gemini(
+			client,
+			[pdf_deel, bouw_assumptie_prompt(driver_pack)],
+			(),
+			schema=AssumptieAntwoord,
+			temperatuur=0,
+		)
 	finally:
 		if upload_naam:
 			try:

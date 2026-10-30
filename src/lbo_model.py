@@ -28,9 +28,9 @@ Een RCF vangt tekorten op: een tekort op de minimum cash gaat eerst naar een tre
 overschot eerst naar de terugbetaling van de RCF, pas daarna naar de sweep en het dividend.
 """
 import math
-from datetime import date
+from datetime import date, timedelta
 
-from . import config, labels
+from . import assumpties, config, labels
 
 NIET_BESCHIKBAAR = float("nan")
 
@@ -44,15 +44,6 @@ VEREISTE_VELDEN = [
 	"Handelsvorderingen",
 	"Handelsschulden",
 	"Ontvangen_Vooruitbetalingen",
-	"Driver_Omzetgroei_Pct",
-	"Driver_Inkoop_Pct",
-	"Driver_Overige_Kosten_Pct",
-	"Driver_DA_Pct_Vaste_Activa",
-	"Driver_Capex_Pct",
-	"Driver_DSO",
-	"Driver_DIO",
-	"Driver_DPO",
-	"Driver_Dagen_Vooruitbetaling",
 	"Driver_Kosten_60_Pct",
 	"Driver_Kosten_6061_Pct",
 	"Open_Vaste_Activa",
@@ -128,6 +119,8 @@ def _geen_lbo(reden):
 		"LBO_Exit_Equity_Jaar5": leeg,
 		"Indicatieve_MoIC": leeg,
 		"Indicatieve_IRR_Pct": leeg,
+		"LBO_MoIC_Exact": leeg,
+		"LBO_IRR_Exact_Pct": leeg,
 		"Jaren": [],
 		"Integriteit": [],
 	}
@@ -170,12 +163,6 @@ def _irr(kasstromen):
 	return (onder + boven) / 2
 
 
-def _glide(start, doel, boekjaar):
-	"""Lineair glide path: het laatste boekjaar is de start, na LBO_KOSTEN_GLIDE_JAREN het doel."""
-	aandeel = min(boekjaar / config.LBO_KOSTEN_GLIDE_JAREN, 1.0)
-	return start + (doel - start) * aandeel
-
-
 def _plus_jaren(datum, jaren):
 	try:
 		return datum.replace(year=datum.year + jaren)
@@ -184,32 +171,25 @@ def _plus_jaren(datum, jaren):
 
 
 def _periodes(boekjaar_einde):
-	"""De closing en de forecastperiodes: eventueel een stub, daarna volledige boekjaren tot de exit."""
+	"""De closing en de vijf forecastperiodes: jaar 1 is eventueel een stub tot het eerste boekjaareinde."""
 	einde = date.fromisoformat(boekjaar_einde)
+	eerste_einde = _plus_jaren(einde, 1)
 	closing = einde
 	if config.LBO_CLOSING_DATUM:
 		closing = max(einde, date.fromisoformat(config.LBO_CLOSING_DATUM))
-
-	boekjaar = 1
-	while _plus_jaren(einde, boekjaar) <= closing:
-		boekjaar += 1
-	volgend_einde = _plus_jaren(einde, boekjaar)
-	fractie = (volgend_einde - closing).days / (volgend_einde - _plus_jaren(einde, boekjaar - 1)).days
-
-	if fractie == 1.0:
-		fracties = [1.0] * config.LBO_HOLDING_PERIOD_YEARS
-	else:
-		fracties = [fractie] + [1.0] * round(config.LBO_HOLDING_PERIOD_YEARS - fractie)
+		closing = min(closing, eerste_einde - timedelta(days=1))
+	fractie = (eerste_einde - closing).days / (eerste_einde - einde).days
 
 	periodes = []
-	for nr, deel in enumerate(fracties, start=1):
-		jaartal = _plus_jaren(einde, boekjaar + nr - 1).year
+	for nr in range(1, config.LBO_HOLDING_PERIOD_YEARS + 1):
+		einddatum = _plus_jaren(einde, nr)
+		deel = fractie if nr == 1 else 1.0
 		periodes.append(
 			{
 				"Nr": nr,
 				"Fractie": deel,
-				"Boekjaar_Index": boekjaar + nr - 1,
-				"Label": labels.period_label(jaartal, stub=deel < 1),
+				"Einde": einddatum,
+				"Label": labels.period_label(einddatum.year, stub=deel < 1),
 			}
 		)
 	return closing, periodes
@@ -298,13 +278,15 @@ def bereken_lbo(rij, scenario="base"):
 	if ebitda_0 <= 0:
 		return _geen_lbo(labels.not_available(labels.REASON_NO_EBITDA))
 
-	aannames = config.LBO_SCENARIOS[scenario]
-	groei = rij["Driver_Omzetgroei_Pct"] / 100
-	prijs = aannames["prijsgroei"]
-	volume = (1 + groei) / (1 + config.LBO_SCENARIOS["base"]["prijsgroei"]) - 1 + aannames["volume_delta"]
-	indexering = aannames["indexering"]
-	da_pct = rij["Driver_DA_Pct_Vaste_Activa"] / 100
-	capex_pct = rij["Driver_Capex_Pct"] / 100
+	if assumpties.heeft_lege_waarden(rij["LBO_Assumpties"]):
+		return _geen_lbo(labels.not_available(labels.REASON_INSUFFICIENT_DATA))
+
+	drivers = rij["LBO_Assumpties"][scenario]
+
+	def driver(sleutel, jaar):
+		"""De aanname ongewijzigd: geen begrenzing en geen terugval."""
+		return drivers[sleutel]["waarden"][jaar - 1]
+
 	kosten_60 = rij["Driver_Kosten_60_Pct"] / 100
 	kosten_6061 = rij["Driver_Kosten_6061_Pct"] / 100
 
@@ -327,14 +309,7 @@ def bereken_lbo(rij, scenario="base"):
 	minimum_cash = float(rij["Minimum_Operationele_Cash"])
 	omzet_0 = float(rij["Omzet_of_Brutomarge"])
 	personeel_0 = float(rij["Personeelskosten"])
-	inkoop_pct_0 = float(rij["Inkoop"]) / omzet_0  # zonder positieve omzet is de LBO al weggevallen (DSO)
-	# De overige kosten zijn het residu: zo sluit het laatste boekjaar exact op de instap-EBITDA
-	overige_pct_0 = (omzet_0 - float(rij["Inkoop"]) - personeel_0 - ebitda_0) / omzet_0
-	inkoop_doel = rij["Driver_Inkoop_Pct"] / 100 + aannames["inkoop_delta"]
-	overige_doel = rij["Driver_Overige_Kosten_Pct"] / 100
-
 	vte_0 = float(rij["VTE"])
-	vte_elasticiteit = config.LBO_VTE_ELASTICITEIT
 
 	vaste_activa_0 = float(rij["Open_Vaste_Activa"])
 	posten = {
@@ -404,19 +379,26 @@ def bereken_lbo(rij, scenario="base"):
 	vintages = []  # [aankoopwaarde, nog af te schrijven]
 	closing, periodes = _periodes(rij["Boekjaar_Einde"])
 	jaren = [balans(labels.LABEL_CLOSING, 0)]
+	omzet_jaar = omzet_0
+	personeel_jaar = personeel_0
+	vte = vte_0
 
 	# 3. Forecast: resultatenrekening, kasstroom, schuldschema en balans
 	for periode in periodes:
 		fractie = periode["Fractie"]
-		boekjaar = periode["Boekjaar_Index"]
+		jaar = periode["Nr"]
 
 		# Kostenstructuur op jaarbasis. De stub neemt daar een deel van.
-		omzet_jaar = omzet_0 * ((1 + volume) * (1 + prijs)) ** boekjaar
-		vte_groei = (1 + volume * vte_elasticiteit) ** boekjaar
-		personeel_jaar = personeel_0 * vte_groei * (1 + indexering) ** boekjaar
-		inkoop_pct = _glide(inkoop_pct_0, inkoop_doel, boekjaar)
-		overige_pct = _glide(overige_pct_0, overige_doel, boekjaar)
-		ebitda_jaar = omzet_jaar * (1 - inkoop_pct - overige_pct) - personeel_jaar
+		volume = driver("volumegroei", jaar) / 100
+		prijs = driver("prijsgroei", jaar) / 100
+		vte_factor = 1 + volume * driver("vte_elasticiteit", jaar)
+		inkoop_pct = driver("inkoop_pct", jaar) / 100
+		overige_pct = driver("overige_kosten_pct", jaar) / 100
+		capex_pct = driver("capex_pct", jaar) / 100
+
+		omzet_jaar = omzet_jaar * (1 + volume) * (1 + prijs)
+		personeel_jaar = personeel_jaar * vte_factor * (1 + driver("loonindexering", jaar) / 100)
+		vte = vte * vte_factor
 
 		omzet = omzet_jaar * fractie
 		inkoop = omzet_jaar * inkoop_pct * fractie
@@ -425,7 +407,9 @@ def bereken_lbo(rij, scenario="base"):
 		ebitda = omzet - inkoop - personeel - overige
 
 		capex = omzet * capex_pct
-		afschrijving_bestaand = min(rest_bestaande_activa, vaste_activa_0 * da_pct * fractie)
+		afschrijving_bestaand = min(
+			rest_bestaande_activa, vaste_activa_0 * driver("da_pct", jaar) / 100 * fractie
+		)
 		vintages.append([capex, capex])
 		afschrijving_nieuw = 0.0
 		for vintage in vintages:
@@ -441,11 +425,11 @@ def bereken_lbo(rij, scenario="base"):
 
 		posten_begin = dict(posten)
 		posten = {
-			"Voorraden": rij["Driver_DIO"] / 365 * omzet_jaar * kosten_60,
-			"Handelsvorderingen": rij["Driver_DSO"] / 365 * omzet_jaar,
+			"Voorraden": driver("dio", jaar) / config.DAGEN_PER_JAAR * omzet_jaar * kosten_60,
+			"Handelsvorderingen": driver("dso", jaar) / config.DAGEN_PER_JAAR * omzet_jaar,
 			"Overige_Activa_Operationeel": overige_activa_0 * omzet_jaar / omzet_0,
-			"Handelsschulden": rij["Driver_DPO"] / 365 * omzet_jaar * kosten_6061,
-			"Vooruitbetalingen": rij["Driver_Dagen_Vooruitbetaling"] / 365 * omzet_jaar,
+			"Handelsschulden": driver("dpo", jaar) / config.DAGEN_PER_JAAR * omzet_jaar * kosten_6061,
+			"Vooruitbetalingen": driver("dagen_vooruitbetaling", jaar) / config.DAGEN_PER_JAAR * omzet_jaar,
 			"Sociale_Schulden": sociale_schulden_0 * personeel_jaar / personeel_0 if personeel_0 > 0 else sociale_schulden_0,
 			"Overige_Passiva": overige_passiva_0 * omzet_jaar / omzet_0,
 		}
@@ -560,17 +544,15 @@ def bereken_lbo(rij, scenario="base"):
 		eigen_vermogen = eigen_vermogen + ronde["Nettowinst"] - ronde["Dividend"]
 		reserves = reserves + ronde["Nettowinst"] - ronde["Dividend"]
 
-		vte = vte_0 * vte_groei
 		ebitda_op_jaarbasis = ebitda / fractie
 		schuld = senior + rcf + vendor
-		vorige_omzet_jaar = omzet_jaar / ((1 + volume) * (1 + prijs))
 		jaren.append(
 			balans(
 				periode["Label"],
 				periode["Nr"],
 				Fractie=fractie,
 				Omzet=omzet,
-				Omzetgroei_Pct=(omzet_jaar / vorige_omzet_jaar - 1) * 100,
+				Omzetgroei_Pct=((1 + volume) * (1 + prijs) - 1) * 100,
 				Inkoop=inkoop,
 				Personeel=personeel,
 				Overige_Kosten=overige,
@@ -582,9 +564,10 @@ def bereken_lbo(rij, scenario="base"):
 				Capex_Pct=capex_pct * 100,
 				VTE=vte,
 				Kost_Per_VTE=personeel_jaar / vte if vte > 0 else NIET_BESCHIKBAAR,
-				DSO=rij["Driver_DSO"],
-				DIO=rij["Driver_DIO"],
-				DPO=rij["Driver_DPO"],
+				DSO=driver("dso", jaar),
+				DIO=driver("dio", jaar),
+				DPO=driver("dpo", jaar),
+				Advance_Days=driver("dagen_vooruitbetaling", jaar),
 				Afschrijvingen=afschrijvingen,
 				Afschrijving_Bestaand=afschrijving_bestaand,
 				Afschrijving_Nieuw=afschrijving_nieuw,
@@ -620,15 +603,15 @@ def bereken_lbo(rij, scenario="base"):
 	dividenden = sum(jaar["Dividend"] for jaar in forecast)
 
 	if sponsor_equity > 0 and exit_equity > 0:
-		moic = round((exit_equity + dividenden) / sponsor_equity, 2)
+		moic = (exit_equity + dividenden) / sponsor_equity
+		# Zonder stub zijn de periodes gelijk (Excel: IRR). Met een stub telt de datum (Excel: XIRR).
+		met_stub = forecast[0]["Fractie"] < 1
 		kasstromen = [(0.0, -sponsor_equity)]
 		tijd = 0.0
-		for jaar in forecast:
-			tijd += jaar["Fractie"]
-			if jaar["Dividend"] > 0:
-				kasstromen.append((tijd, jaar["Dividend"]))
-		kasstromen.append((duur, exit_equity))
-		irr_pct = round(_irr(kasstromen) * 100, 1)
+		for jaar, periode in zip(forecast, periodes):
+			tijd = (periode["Einde"] - closing).days / config.DAGEN_PER_JAAR if met_stub else tijd + 1
+			kasstromen.append((tijd, jaar["Dividend"] + (exit_equity if jaar is forecast[-1] else 0.0)))
+		irr_pct = _irr(kasstromen) * 100
 	else:
 		moic = 0.0
 		irr_pct = -100.0
@@ -668,8 +651,10 @@ def bereken_lbo(rij, scenario="base"):
 		"LBO_Balanscheck": labels.CHECK_OK if balans_ok else labels.CHECK_ERROR,
 		"LBO_Exit_EV_Jaar5": exit_ev,
 		"LBO_Exit_Equity_Jaar5": exit_equity,
-		"Indicatieve_MoIC": moic,
-		"Indicatieve_IRR_Pct": irr_pct,
+		"Indicatieve_MoIC": round(moic, 2),
+		"Indicatieve_IRR_Pct": round(irr_pct, 1),
+		"LBO_MoIC_Exact": moic,
+		"LBO_IRR_Exact_Pct": irr_pct,
 		"Jaren": jaren,
 		"Integriteit": integriteit,
 	}

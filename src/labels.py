@@ -206,6 +206,32 @@ TEXT_UNKNOWN = "unknown"
 COMMENTARY_NO_GEMINI = "No commentary: Gemini is not available."
 COMMENTARY_FAILED = "Commentary failed: run the script again."
 
+ASSUMPTIONS_AI = "Gemini AI proposal"
+ASSUMPTIONS_FALLBACK_HISTORY = "Historical fallback (insufficient history)"
+ASSUMPTIONS_FALLBACK_NO_AI = "Historical fallback (Gemini not available)"
+ASSUMPTIONS_FALLBACK_NOT_REQUIRED = "Historical fallback (no LBO to calculate)"
+
+DRIVER_PRICE = "Price Growth"
+DRIVER_VOLUME = "Volume Growth"
+DRIVER_INDEXATION = "Wage Indexation"
+DRIVER_ELASTICITY = "FTE Elasticity to Volume"
+DRIVER_COGS = "Cost of Goods & Services % Revenue"
+DRIVER_OPEX = "Other Operating Expenses % Revenue"
+DRIVER_DA = "D&A % Opening PP&E & Intangibles"
+DRIVER_CAPEX = "Capex % Revenue"
+DRIVER_DSO = "DSO"
+DRIVER_DIO = "DIO"
+DRIVER_DPO = "DPO"
+DRIVER_ADVANCES = "Customer Advance Days"
+DRIVER_REVENUE_GROWTH = "Revenue Growth"
+DRIVER_EBITDA_MARGIN = "EBITDA Margin"
+
+ASSUMPTION_FLAG_BOUNDS = "{years} outside the range {low:g} to {high:g}"
+ASSUMPTION_FLAG_HISTORY = "{years} more than {margin:g} outside the historical range {low:.1f} to {high:.1f}"
+ASSUMPTION_FLAG_ORDER = "{worse} is better than {better} in {years}"
+FLAG_ASSUMPTIONS = "Assumption flag: {detail}"
+FLAG_CLOSING_LIMITED = "Closing date limited to {date}: at most 12 months after the last filed accounts"
+
 # ============================================================================
 # Workbooks
 # ============================================================================
@@ -364,4 +390,8 @@ COLUMN_LABELS = {
 	"Kwalitatief_LBO_Oordeel": "Qualitative LBO Commentary",
 	"Bronbestand": "Source File",
 	"Gebruikt_Model": "Gemini Model",
+	"LBO_Assumptie_Bron": "Assumption Source",
+	"LBO_Forecast_Groei_Pct": "Forecast Revenue CAGR",
+	"LBO_IRR_Exact_Pct": "IRR (Unrounded)",
+	"LBO_MoIC_Exact": "MoIC (Unrounded)",
 }
