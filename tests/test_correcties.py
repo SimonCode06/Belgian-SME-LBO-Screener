@@ -247,3 +247,21 @@ def test_approved_item_also_lowers_the_ai_cost_ratio(cijfers, filings):
 	assert b == pytest.approx(a - verschil)
 	jaar1 = [r["LBO_Scenarios"]["base"]["Jaren"][1] for r in (zonder, met)]
 	assert jaar1[1]["EBITDA"] - jaar1[0]["EBITDA"] == pytest.approx(verschil / 100 * jaar1[1]["Omzet"])
+
+
+# --- 3.5 Multiples ------------------------------------------------------------------------
+
+from src.lbo_model import kies_multiples  # noqa: E402
+
+
+def test_multiples_have_no_jump():
+	onder, boven = kies_multiples(999_000.0), kies_multiples(1_001_000.0)
+	assert abs(onder[0] - boven[0]) < 0.01 and abs(onder[1] - boven[1]) < 0.01
+
+
+def test_multiples_rise_monotonically_and_stay_flat_outside_the_anchors():
+	reeks = [kies_multiples(float(ebitda)) for ebitda in range(0, 12_000_001, 50_000)]
+	assert all(b[0] >= a[0] and b[1] >= a[1] for a, b in zip(reeks, reeks[1:]))
+	assert kies_multiples(100_000.0) == (4.0, 1.5) and kies_multiples(20_000_000.0) == (7.0, 3.5)
+	assert kies_multiples(750_000.0) == (4.5, 2.0)
+	assert kies_multiples(1_250_000.0) == pytest.approx((4.75, 2.25))

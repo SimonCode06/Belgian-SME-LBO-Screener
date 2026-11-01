@@ -25,15 +25,16 @@ MODEL_VERSIE = "2.0"
 # LBO- & Trend-parameters (Fase 1 t/m 4)
 # ============================================================================
 # Multiples hangen af van de grootte: een KMO met € 300k EBITDA krijgt geen 6x.
-# (EBITDA tot, instapmultiple EV/EBITDA, senior schuld/EBITDA). Exit = instap: geen multiple expansion.
-# Dit zijn aannames: vervang ze door je eigen marktdata. Sectoren ontbreken omdat de NACE-code
-# niet in de CSV of PDF staat.
-LBO_MULTIPLE_TABEL = [
-	(500_000, 4.0, 1.5),
-	(1_000_000, 4.5, 2.0),
-	(2_500_000, 5.0, 2.5),
-	(5_000_000, 6.0, 3.0),
-	(float("inf"), 7.0, 3.5),
+# Ankerpunten (EBITDA, instapmultiple EV/EBITDA, senior schuld/EBITDA). Tussen twee punten wordt lineair
+# geïnterpoleerd, buiten de uiterste punten blijft de waarde vlak: zo geeft € 1 meer EBITDA nooit een
+# sprong in de waardering. Exit = instap: geen multiple expansion.
+# Dit zijn aannames: vervang ze door je eigen marktdata. De sectorcorrectie (NACE) volgt in fase 7.
+LBO_MULTIPLE_ANKERS = [
+	(250_000, 4.0, 1.5),
+	(750_000, 4.5, 2.0),
+	(1_750_000, 5.0, 2.5),
+	(3_750_000, 6.0, 3.0),
+	(7_500_000, 7.0, 3.5),
 ]
 LBO_MIN_EBITDA = 250_000         # Daaronder is een LBO niet realistisch
 

@@ -6,17 +6,17 @@
   "Data_Volledigheid": "Complete",
   "Eigendom": "Ownership unknown",
   "Genormaliseerde_EBITDA": 1600000.0,
-  "Indicatieve_EV": 8000000.0,
-  "Indicatieve_Equity_Value": 8640000.0,
-  "Instap_Multiple": 5.0,
+  "Indicatieve_EV": 7880000.0,
+  "Indicatieve_Equity_Value": 8520000.0,
+  "Instap_Multiple": 4.925,
   "LBO_Balanscheck": "OK",
   "LBO_EBITDA_Jaar5": 1881816.167401856,
-  "LBO_Eind_Net_Debt_to_EBITDA": -0.14,
-  "LBO_Instap_EV": 8000000.0,
-  "LBO_Laagste_Cash": 297585.57250489225,
+  "LBO_Eind_Net_Debt_to_EBITDA": -0.22,
+  "LBO_Instap_EV": 7880000.0,
+  "LBO_Laagste_Cash": 310537.0010763209,
   "LBO_RCF_Piek": 0.0,
-  "LBO_Senior_Schuld": 4000000.0,
-  "LBO_Sponsor_Equity_Instap": 3520000.0,
+  "LBO_Senior_Schuld": 3879999.9999999995,
+  "LBO_Sponsor_Equity_Instap": 3527200.0,
   "LBO_Status": "POSSIBLE CANDIDATE (See Red Flags)",
   "Minimum_Operationele_Cash": 260000.0,
   "Net_Debt": -900000.0,
@@ -25,42 +25,42 @@
       "Indicatieve_IRR_Pct": 22.4,
       "Indicatieve_MoIC": 2.75,
       "LBO_Convenanten": "OK",
-      "LBO_Hoogste_Leverage": 2.36,
-      "LBO_Laagste_DSCR": 1.3,
-      "LBO_Laagste_Rentedekking": 4.98
+      "LBO_Hoogste_Leverage": 2.27,
+      "LBO_Laagste_DSCR": 1.34,
+      "LBO_Laagste_Rentedekking": 5.11
     },
     "downside": {
-      "Indicatieve_IRR_Pct": 11.8,
-      "Indicatieve_MoIC": 1.75,
-      "LBO_Convenanten": "BREACHED: Y1 DSCR 1.12x",
-      "LBO_Hoogste_Leverage": 2.87,
-      "LBO_Laagste_DSCR": 1.12,
-      "LBO_Laagste_Rentedekking": 4.37
+      "Indicatieve_IRR_Pct": 12.0,
+      "Indicatieve_MoIC": 1.76,
+      "LBO_Convenanten": "BREACHED: Y1 DSCR 1.16x",
+      "LBO_Hoogste_Leverage": 2.77,
+      "LBO_Laagste_DSCR": 1.16,
+      "LBO_Laagste_Rentedekking": 4.49
     },
     "screening_base": {
-      "Indicatieve_IRR_Pct": 26.7,
+      "Indicatieve_IRR_Pct": 26.6,
       "Indicatieve_MoIC": 3.26,
       "LBO_Convenanten": "OK",
-      "LBO_Hoogste_Leverage": 2.19,
-      "LBO_Laagste_DSCR": 1.33,
-      "LBO_Laagste_Rentedekking": 5.1
+      "LBO_Hoogste_Leverage": 2.11,
+      "LBO_Laagste_DSCR": 1.37,
+      "LBO_Laagste_Rentedekking": 5.24
     },
     "screening_stress": {
       "Indicatieve_IRR_Pct": 21.4,
       "Indicatieve_MoIC": 2.64,
-      "LBO_Convenanten": "BREACHED: Y1 DSCR 1.05x",
-      "LBO_Hoogste_Leverage": 2.93,
-      "LBO_Laagste_DSCR": 1.05,
-      "LBO_Laagste_Rentedekking": 4.08
+      "LBO_Convenanten": "BREACHED: Y1 DSCR 1.08x",
+      "LBO_Hoogste_Leverage": 2.83,
+      "LBO_Laagste_DSCR": 1.08,
+      "LBO_Laagste_Rentedekking": 4.19
     },
     "upside": {
-      "Indicatieve_IRR_Pct": 30.9,
-      "Indicatieve_MoIC": 3.84,
+      "Indicatieve_IRR_Pct": 30.8,
+      "Indicatieve_MoIC": 3.83,
       "LBO_Convenanten": "OK",
-      "LBO_Hoogste_Leverage": 1.95,
-      "LBO_Laagste_DSCR": 1.48,
-      "LBO_Laagste_Rentedekking": 5.61
+      "LBO_Hoogste_Leverage": 1.87,
+      "LBO_Laagste_DSCR": 1.53,
+      "LBO_Laagste_Rentedekking": 5.76
     }
   },
-  "Senior_Multiple": 2.5
+  "Senior_Multiple": 2.425
 }

@@ -61,13 +61,17 @@ WERKKAPITAAL_PASSIVA = ("Handelsschulden", "Vooruitbetalingen", "Sociale_Schulde
 
 
 def kies_multiples(ebitda):
-	"""Instapmultiple en senior schuldmultiple volgens de grootte van het bedrijf."""
+	"""Instapmultiple en senior schuldmultiple volgens de grootte: lineair tussen de ankerpunten, vlak erbuiten."""
 	if math.isnan(ebitda):
 		return NIET_BESCHIKBAAR, NIET_BESCHIKBAAR
-	for tot, instap, senior in config.LBO_MULTIPLE_TABEL:
-		if ebitda < tot:
-			return instap, senior
-	return NIET_BESCHIKBAAR, NIET_BESCHIKBAAR
+	ankers = sorted(config.LBO_MULTIPLE_ANKERS)
+	if ebitda <= ankers[0][0]:
+		return ankers[0][1], ankers[0][2]
+	for (x0, instap0, senior0), (x1, instap1, senior1) in zip(ankers, ankers[1:]):
+		if ebitda <= x1:
+			deel = (ebitda - x0) / (x1 - x0)
+			return instap0 + deel * (instap1 - instap0), senior0 + deel * (senior1 - senior0)
+	return ankers[-1][1], ankers[-1][2]
 
 
 def net_debt(doel, financiele_schuld, cash, minimum_cash, debt_like=0.0):
