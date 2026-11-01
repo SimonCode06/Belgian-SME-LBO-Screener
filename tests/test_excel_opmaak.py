@@ -59,3 +59,37 @@ def test_overview_opens_on_a_ranking_sorted_by_score(cijfers, filings, tmp_path,
 	kleuren = {achtergrond for achtergrond, _ in labels.STATUS_COLOURS.values()}
 	assert status.fill.fgColor.rgb[-6:] in kleuren
 	assert ws.cell(row=5, column=9).number_format == stijl.FMT_MULT
+
+
+def test_colour_code_fonts_and_formats_on_every_tab(boek):
+	"""Blue = hardcoded number, green = pure link to another tab, black = other formula; one font; 0.0x multiples."""
+	import re
+
+	wb, kaart = boek
+	link = re.compile(r"^=-?'[^']+'!\$?[A-Z]+\$?\d+$")
+	afwijkingen = []
+	for ws in wb.worksheets:
+		assert ws.sheet_view.showGridLines is False, ws.title
+		assert ws.page_setup.orientation == "landscape", ws.title
+		for regel in ws.iter_rows():
+			for cel in regel:
+				if cel.value is None:
+					continue
+				assert cel.font.name == stijl.LETTERTYPE, f"{ws.title}!{cel.coordinate}"
+				assert '0.00"x"' not in str(cel.number_format), f"{ws.title}!{cel.coordinate}"
+				kleur = (cel.font.color.rgb or "")[-6:] if cel.font.color is not None else stijl.ZWART
+				if isinstance(cel.value, (int, float)) and not isinstance(cel.value, bool):
+					if kleur != stijl.BLAUW:
+						afwijkingen.append(f"{ws.title}!{cel.coordinate} number {cel.value} in {kleur}")
+				elif isinstance(cel.value, str) and link.match(cel.value) and kleur != stijl.GROEN:
+					afwijkingen.append(f"{ws.title}!{cel.coordinate} link {cel.value} in {kleur}")
+	assert not afwijkingen, afwijkingen[:10]
+
+	inp = wb[labels.TAB_INPUTS]
+	ri = kaart["rijen"]["inp"]
+	for kolom in kaart["kolommen"]["jaren"]:
+		cel = inp[f"{kolom}{ri['ov_base_dso']}"]
+		assert cel.fill.fgColor.rgb.endswith(stijl.VULLING_OVERRIDE) and cel.value is None
+	assert inp[f"C{ri['Entry_Multiple']}"].number_format == '0.0"x"'
+	assert wb[labels.TAB_LBO][f"{kaart['kolommen']['jaren'][0]}{kaart['rijen']['lbo']['c_dscr']}"].number_format == stijl.FMT_RATIO
+	assert stijl.FMT_BEDRAG.endswith('"–"_)')  # zero shows as a dash

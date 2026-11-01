@@ -1,6 +1,8 @@
 # Draait bij elke push en pull request alle tests op een schone Ubuntu-machine.
 # De Excel-recalculatietest heeft echte Excel nodig en wordt hier automatisch overgeslagen,
 # net als de regressietest op echte data (tests/baseline_local staat niet in git).
+# In de plaats herberekent LibreOffice (headless) het werkboek: Python = Excel-formules,
+# geen #REF!/#DIV/0!/#VALUE!/#NAME? (tests/test_libreoffice.py, alleen op Python 3.12).
 name: tests
 
 on:
@@ -21,5 +23,8 @@ jobs:
           cache: pip
       - name: Afhankelijkheden installeren
         run: pip install -r requirements.txt
+      - name: LibreOffice installeren (herberekening van het werkboek)
+        if: matrix.python-version == '3.12'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libreoffice-calc
       - name: Tests
         run: pytest --cov=src --cov-report=term
