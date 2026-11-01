@@ -264,6 +264,9 @@ FLAG_CATEGORIES = {
 	"juridisch": "Legal",
 	"klantconcentratie": "Customer concentration",
 	"personeel": "Personnel",
+	"financieel": "Financial",
+	"data": "Data quality",
+	"analyst_case": "Analyst case",
 	"overig": "Other",
 }
 SEVERITIES = {"hoog": "HIGH", "middel": "MEDIUM", "laag": "LOW"}
@@ -435,6 +438,54 @@ STATUS_LABEL = "LBO Assessment"
 OVERRIDES_ACTIVE = "Overrides active"
 OVERRIDES_NOTE = "The assessment follows the screening case (scorecard) and does not follow overrides."
 SCENARIO_NOTE = "Python results on the proposed assumptions: these do not follow overrides."
+
+# Executive Summary (IC one-pager)
+TAB_RISKS = "Risks & Adjustments"
+TITLE_RISKS = "RISKS & ADJUSTMENTS"
+SECTION_VERDICT = "SCREENING VERDICT (FILING AND SCREENING CASE)"
+ACTIVE_CASE = "Active Case Check (Live)"
+ACTIVE_WORKS = "WORKS"
+ACTIVE_FAILS = "DOES NOT WORK"
+ACTIVE_ERROR = "MODEL ERROR"
+ACTIVE_NOTE = "Active scenario incl. overrides: covenants met, IRR at or above target, RCF repaid at exit. Does not change the verdict."
+OVERRIDES_COUNT = "Overrides in Use (Cells)"
+SUMMARY_SCORE = "Screening Score (0-100)"
+SUMMARY_ROBUSTNESS = "Robustness (Grid Runs Passing)"
+SUMMARY_THESIS = "Investment Thesis"
+SECTION_RETURNS = "RETURNS AND CREDIT: SCREENING CASE VS ANALYST CASE"
+COLUMN_ACTIVE = "Active (Live)"
+RETURNS_NOTE = "Scenario columns: Python on the proposed assumptions, they do not follow overrides. Active: live, follows the inputs tab."
+SECTION_DEAL = "TRANSACTION AND STRUCTURE"
+SECTION_SUMMARY_SCORECARD = "SCREENING SCORECARD"
+SECTION_TOP_RISKS = "TOP RISKS (MOST SEVERE FIRST; FULL LIST ON THE RISKS & ADJUSTMENTS TAB)"
+SECTION_DD = "KEY DUE DILIGENCE QUESTIONS"
+NO_RISKS = "No red flags"
+NO_DD = "No questions proposed"
+SUMMARY_LABELS = {
+	"entry_ebitda": "Adjusted EBITDA (Entry)",
+	"entry_multiple": "Entry Multiple",
+	"entry_ev": "Entry EV",
+	"adj_nd": "Adjusted Net Debt",
+	"eq_price": "Equity Purchase Price",
+	"s_equity": "Sponsor Equity",
+	"senior": "Senior Debt (x EBITDA)",
+	"senior_type": "Senior Market (Deal Size)",
+	"dc": "Debt Capacity (Screening Stress)",
+	"atp": "Max Entry Multiple at Target IRR",
+	"headroom": "Price Headroom vs Entry",
+	"x_lev": "Exit Net Debt / EBITDA",
+	"irr": "IRR",
+	"moic": "MoIC",
+	"x_ebitda": "Exit EBITDA (Y5)",
+	"min_dscr": "Lowest DSCR",
+	"peak_lev": "Peak Senior Leverage",
+	"rcf_peak": "RCF Peak Drawn",
+	"rcf_exit": "RCF Balance at Exit",
+	"covenants": "Covenant Test",
+	"fcf": "Free Cash Flow",
+	"lev": "Senior Net Debt / EBITDA",
+	"dscr": "DSCR",
+}
 
 # Row labels of the workbook, by internal row key
 ROW_LABELS = {
@@ -675,6 +726,7 @@ INPUT_LABELS = {
 	"Val_Excess_Only": "Valuation: Only Cash above Minimum (1 = yes)",
 	"Val_Debt_Like": "Valuation: Include Debt-Like Items (1 = yes)",
 	"Check_Tolerance": "Check Tolerance (EUR)",
+	"Target_IRR": "Target IRR (Sponsor Hurdle)",
 }
 TAB_DETAIL = "Full Data Detail"
 

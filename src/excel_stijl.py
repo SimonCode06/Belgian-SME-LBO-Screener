@@ -36,6 +36,8 @@ RAND_SUBTOTAAL = Border(top=DUN)
 RAND_EINDTOTAAL = Border(top=DUN, bottom=DUBBEL)
 RAND_OVERRIDE = Border(left=DUN_GRIJS, right=DUN_GRIJS, top=DUN_GRIJS, bottom=DUN_GRIJS)
 
+ERNST_KLEUR = {"hoog": ROOD, "middel": "9C6500", "laag": "595959"}
+
 VUL_SECTIE = PatternFill("solid", fgColor=KOP_DONKER)
 VUL_OVERRIDE = PatternFill("solid", fgColor=VULLING_OVERRIDE)
 VUL_ACTUAL = PatternFill("solid", fgColor=VULLING_ACTUAL)
@@ -56,13 +58,13 @@ def sectiekop(cel, tekst=None):
 	cel.alignment = Alignment(vertical="center")
 
 
-def afdruk(ws, bedrijf, titelrijen="1:4", titelkolommen="A:B"):
-	"""A4 landscape, one page wide, titles repeated, and a confidential footer with page numbers."""
+def afdruk(ws, bedrijf, titelrijen="1:4", titelkolommen="A:B", een_pagina=False):
+	"""A4 landscape, one page wide (or one page in all), titles repeated, a confidential footer with page numbers."""
 	ws.page_setup.orientation = "landscape"
 	ws.page_setup.paperSize = ws.PAPERSIZE_A4
 	ws.sheet_properties.pageSetUpPr.fitToPage = True
 	ws.page_setup.fitToWidth = 1
-	ws.page_setup.fitToHeight = 0
+	ws.page_setup.fitToHeight = 1 if een_pagina else 0
 	ws.page_margins.left = ws.page_margins.right = 0.4
 	ws.page_margins.top = ws.page_margins.bottom = 0.5
 	if titelrijen:

@@ -184,7 +184,8 @@ def test_override_flows_through_and_the_balance_still_closes(excel, tmp_path, ri
 		open_wb.scenario("Base")
 		irr_voor = open_wb.cel("lbo", "x_irr")
 		ebitda_voor = open_wb.rij("model", "ebitda")
-		assert open_wb.samenvatting.Range(kaart["overrides_cel"]).Value == labels.NO
+		assert open_wb.inp.Range(kaart["overrides_cel"]).Value == 0
+		assert open_wb.samenvatting.Range(kaart["actief_cel"]).Value == labels.ACTIVE_WORKS
 
 		open_wb.override("base", "inkoop_pct", 3, 0.63)
 		open_wb.override("base", "dso", 2, 80)
@@ -196,7 +197,7 @@ def test_override_flows_through_and_the_balance_still_closes(excel, tmp_path, ri
 		assert open_wb.cel("lbo", "x_irr") != irr_voor
 		assert open_wb.checks() == labels.CHECK_OK
 		assert max(open_wb.rij("model", "bs_check")) < 1
-		assert open_wb.samenvatting.Range(kaart["overrides_cel"]).Value == labels.YES
+		assert open_wb.inp.Range(kaart["overrides_cel"]).Value == 2
 
 		# Another scenario ignores the override of Base
 		open_wb.scenario("Upside")
@@ -302,7 +303,7 @@ def test_company_without_lbo_gets_a_summary_tab_only(tmp_path, cijfers, filings,
 	assert boek.sheetnames == [labels.TAB_SUMMARY]
 	assert "No LBO projection possible" in str(boek[labels.TAB_SUMMARY]["A3"].value)
 	volledig = openpyxl.load_workbook(next(pad for pad in paden if "Testco" in pad.name))
-	assert volledig.sheetnames == [labels.TAB_SUMMARY, labels.TAB_INPUTS, labels.TAB_MODEL, labels.TAB_LBO]
+	assert volledig.sheetnames == [labels.TAB_SUMMARY, labels.TAB_INPUTS, labels.TAB_MODEL, labels.TAB_LBO, labels.TAB_RISKS]
 
 
 def test_workbook_standard(rij, tmp_path, filings):

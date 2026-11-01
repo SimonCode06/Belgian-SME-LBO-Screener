@@ -18,7 +18,7 @@ from typing import Callable, Optional
 
 import pandas as pd
 from openpyxl import Workbook
-from openpyxl.formatting.rule import CellIsRule
+from openpyxl.formatting.rule import CellIsRule, DataBarRule
 from openpyxl.styles import Alignment
 from openpyxl.utils import get_column_letter
 from openpyxl.workbook.defined_name import DefinedName
@@ -29,6 +29,7 @@ from . import excel_stijl as stijl
 from .lbo_model import net_debt_formule
 
 HOOFD = 4  # rows above the data: title, checks, LBO year, fiscal year
+GROOTTE_KLEIN = 8
 ZIJDE_MODEL = "'" + labels.TAB_MODEL + "'!"
 ZIJDE_LBO = "'" + labels.TAB_LBO + "'!"
 ZIJDE_INP = "'" + labels.TAB_INPUTS + "'!"
@@ -614,6 +615,7 @@ def _invoer(rij):
 	return [
 		("valuation", "Entry_Multiple", float(rij["Instap_Multiple"]), stijl.FMT_MULT),
 		("valuation", "Exit_Multiple", float(rij["Instap_Multiple"]), stijl.FMT_MULT),
+		("valuation", "Target_IRR", config.LBO_MIN_IRR_PCT / 100, stijl.FMT_PCT),
 		("senior", "Senior_Multiple", float(rij["Senior_Multiple"]), stijl.FMT_MULT),
 		("senior", "Senior_Rate", float(rij["Senior_Rente_Pct"]) / 100, stijl.FMT_PCT),
 		("senior", "Senior_Amortisation", float(rij["Senior_Aflossing_Pct"]) / 100, stijl.FMT_PCT),
@@ -766,6 +768,7 @@ class Bouwer:
 		self.ws_inp = self.wb.create_sheet(labels.TAB_INPUTS)
 		self.ws_model = self.wb.create_sheet(labels.TAB_MODEL)
 		self.ws_lbo = self.wb.create_sheet(labels.TAB_LBO)
+		self.ws_risico = self.wb.create_sheet(labels.TAB_RISKS)
 		self.override_cellen = []
 
 	# ------------------------------------------------------------------ row layout
@@ -774,7 +777,7 @@ class Bouwer:
 		ri = self.r["inp"]
 		rij_nr = HOOFD + 1
 		self.scenario_rij = rij_nr + 1
-		rij_nr += 10  # section, selector, list, index, five-line legend and a blank line
+		rij_nr += 11  # section, selector, list, index, override count, five-line legend and a blank line
 
 		self.invoer = _invoer(self.rij)
 		self.invoer_start = rij_nr
@@ -937,8 +940,8 @@ class Bouwer:
 	def _ctx(self, blad, kolom, jaar=0):
 		return Ctx(self.kol, self.r, blad, kolom, jaar)
 
-	def _kop(self, ws, titel, blad):
-		"""Title, checks row, LBO year and fiscal year: the same on every tab."""
+	def _kop(self, ws, titel, blad, jaren=True):
+		"""Title, checks row, LBO year and fiscal year: the same on every tab (the summary has no year rows)."""
 		tot = self.kol.laatste_jaar
 		for kolom in range(1, (self.kol.overrides if blad in ("model", "inp") else tot) + 1):
 			stijl.sectiekop(ws.cell(row=1, column=kolom))
@@ -980,32 +983,36 @@ class Bouwer:
 			ws.conditional_formatting.add(cel, CellIsRule(operator="equal", formula=[f'"{labels.CHECK_OK}"'], fill=groen, font=stijl.lettertype(stijl.GROEN, vet=True)))
 			ws.conditional_formatting.add(cel, CellIsRule(operator="notEqual", formula=[f'"{labels.CHECK_OK}"'], fill=rood, font=stijl.lettertype(stijl.ROOD, vet=True)))
 		ws.row_dimensions[2].height = 26
-
-		ws.cell(row=3, column=1, value=labels.HEADER_LBO_YEAR).font = stijl.lettertype(vet=True)
-		ws.cell(row=4, column=1, value=labels.HEADER_FISCAL_YEAR).font = stijl.lettertype(vet=True)
-		for index, kolom_nr in enumerate(self.kol.hist):
-			ws.cell(row=3, column=kolom_nr, value=labels.HEADER_ACTUAL)
-			ws.cell(row=4, column=kolom_nr, value=self.historiek[index]["Label"])
-		ws.cell(row=3, column=self.kol.closing, value="Year 0")
-		ws.cell(row=4, column=self.kol.closing, value=labels.LABEL_CLOSING)
-		for jaar, kolom_nr in enumerate(self.kol.jaren, start=1):
-			ws.cell(row=3, column=kolom_nr, value=f"Year {jaar}")
-			ws.cell(row=4, column=kolom_nr, value=self.rij["LBO_Jaren"][jaar]["Label"])
-		for rij_nr in (3, 4):
-			for kolom_nr in self.kol.alle:
-				cel = ws.cell(row=rij_nr, column=kolom_nr)
-				cel.font = stijl.lettertype(vet=True)
-				cel.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-				if rij_nr == 4:
-					cel.border = stijl.RAND_SUBTOTAAL
-			self._grijs(ws, rij_nr)
+		if jaren:
+			self._jaarkoppen(ws, 3)
 
 		ws.sheet_view.showGridLines = False
-		ws.freeze_panes = ws.cell(row=HOOFD + 1, column=2)
+		ws.freeze_panes = ws.cell(row=HOOFD + 1 if jaren else 3, column=2 if jaren else 1)
 		ws.column_dimensions["A"].width = 52
 		ws.column_dimensions["B"].width = 7
 		for kolom_nr in self.kol.alle:
 			ws.column_dimensions[get_column_letter(kolom_nr)].width = 13
+
+	def _jaarkoppen(self, ws, rij):
+		"""Two header rows: LBO year and fiscal year."""
+		ws.cell(row=rij, column=1, value=labels.HEADER_LBO_YEAR).font = stijl.lettertype(vet=True)
+		ws.cell(row=rij + 1, column=1, value=labels.HEADER_FISCAL_YEAR).font = stijl.lettertype(vet=True)
+		for index, kolom_nr in enumerate(self.kol.hist):
+			ws.cell(row=rij, column=kolom_nr, value=labels.HEADER_ACTUAL)
+			ws.cell(row=rij + 1, column=kolom_nr, value=self.historiek[index]["Label"])
+		ws.cell(row=rij, column=self.kol.closing, value="Year 0")
+		ws.cell(row=rij + 1, column=self.kol.closing, value=labels.LABEL_CLOSING)
+		for jaar, kolom_nr in enumerate(self.kol.jaren, start=1):
+			ws.cell(row=rij, column=kolom_nr, value=f"Year {jaar}")
+			ws.cell(row=rij + 1, column=kolom_nr, value=self.rij["LBO_Jaren"][jaar]["Label"])
+		for rij_nr in (rij, rij + 1):
+			for kolom_nr in self.kol.alle:
+				cel = ws.cell(row=rij_nr, column=kolom_nr)
+				cel.font = stijl.lettertype(vet=True)
+				cel.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+				if rij_nr == rij + 1:
+					cel.border = stijl.RAND_SUBTOTAAL
+			self._grijs(ws, rij_nr)
 
 	def _voet(self, ws, rij):
 		regels = [
@@ -1079,7 +1086,14 @@ class Bouwer:
 		self._label(ws, index_rij, labels.SCENARIO_INDEX)
 		self._zet(ws, index_rij, 3, "=MATCH(Scenario,Scenario_List,0)", "0")
 
-		legenda = index_rij + 1
+		telling = index_rij + 1
+		self._label(ws, telling, labels.OVERRIDES_COUNT, vet=True)
+		kolom = get_column_letter(self.kol.overrides)
+		eerste = self.ai_blokken[assumpties.MODEL_SCENARIOS[0]]
+		self._zet(ws, telling, 3, f"=SUM({kolom}{eerste}:{kolom}{self.inp_einde})", "0", vet=True)
+		self.overrides_cel = f"C{telling}"
+
+		legenda = telling + 1
 		self._label(ws, legenda, labels.LEGEND, vet=True)
 		ws.cell(row=legenda, column=3, value=labels.LEGEND_INPUT).font = stijl.lettertype(stijl.BLAUW)
 		ws.cell(row=legenda + 1, column=3, value=labels.LEGEND_FORMULA).font = stijl.lettertype()
@@ -1096,6 +1110,7 @@ class Bouwer:
 		self.namen["Scenario"] = f"{ZIJDE_INP}$C${self.scenario_rij}"
 		self.namen["Scenario_List"] = f"{ZIJDE_INP}$C${lijst_rij}:${laatste}${lijst_rij}"
 		self.namen["Scenario_Index"] = f"{ZIJDE_INP}$C${lijst_rij + 1}"
+		self.namen["Overrides_Count"] = f"{ZIJDE_INP}$C${lijst_rij + 2}"
 
 	def _schrijf_tijdlijn(self, ws):
 		rm = self.r["model"]
@@ -1437,56 +1452,39 @@ class Bouwer:
 			"@", vet=True,
 		)
 
+	# ------------------------------------------------------------------ executive summary
+	def _paar(self, ws, nr, label, waarde, fmt, kolom=1, waarde_kolom=3, vet=False):
+		"""A label and one value; on the right half the label sits in column E (merged to G), the value in H."""
+		cel = ws.cell(row=nr, column=kolom, value=label)
+		cel.font = stijl.lettertype(vet=vet)
+		if kolom > 1:
+			ws.merge_cells(start_row=nr, start_column=kolom, end_row=nr, end_column=waarde_kolom - 1)
+		waarde_cel = self._zet(ws, nr, waarde_kolom, waarde, fmt, vet=vet)
+		if fmt == "@" and kolom > 1:  # text on the right half runs to the last column
+			ws.merge_cells(start_row=nr, start_column=waarde_kolom, end_row=nr, end_column=self.kol.laatste_jaar)
+			waarde_cel.alignment = Alignment(horizontal="left", vertical="center")
+
+	def _breed(self, ws, nr, kolom, tekst, tot=None, grootte=GROOTTE_KLEIN, cursief=False):
+		"""Text merged to the last forecast column, wrapped; the row grows with the text."""
+		tot = tot or self.kol.laatste_jaar
+		tekst = str(tekst or "").strip() or "-"
+		ws.merge_cells(start_row=nr, start_column=kolom, end_row=nr, end_column=tot)
+		cel = ws.cell(row=nr, column=kolom, value=tekst)
+		cel.font = stijl.lettertype(grootte=grootte, cursief=cursief)
+		cel.alignment = Alignment(vertical="top", wrap_text=True)
+		breedte = (tot - kolom + 1) * 13 * 1.2 * (10 / grootte)
+		regels = sum(max(1, int(len(deel) / breedte) + 1) for deel in tekst.split("\n"))
+		ws.row_dimensions[nr].height = max(13, 11.5 * regels + 2)
+
 	def schrijf_samenvatting(self):
+		"""The IC one-pager: verdict, live check, returns by case, structure, scorecard, risks, questions, trend."""
 		ws = self.ws_samenvatting
 		rij = self.rij
-		rm, rl = self.r["model"], self.r["lbo"]
-		self._kop(ws, labels.TITLE_SUMMARY, "samenvatting")
-		nr = HOOFD + 1
-
-		status = ws.cell(row=nr, column=3, value=rij["LBO_Status"])
-		self._label(ws, nr, labels.STATUS_LABEL, vet=True)
-		ws.merge_cells(start_row=nr, start_column=3, end_row=nr, end_column=7)
-		stijl.status_kleur(status, rij["LBO_Status"])
-		status.alignment = Alignment(horizontal="center", vertical="center")
-		nr += 1
-
-		self._label(ws, nr, labels.OVERRIDES_ACTIVE, vet=True)
-		som = "+".join(f"{ZIJDE_INP}{cel}" for cel in self.override_cellen)
-		self._zet(ws, nr, 3, f'=IF({som}>0,"{labels.YES}","{labels.NO}")', "@")
-		ws.cell(row=nr, column=4, value=labels.OVERRIDES_NOTE).font = stijl.lettertype(cursief=True)
-		self.overrides_cel = f"C{nr}"
-		nr += 1
-
-		self._label(ws, nr, labels.SCENARIO_SELECT)
-		self._zet(ws, nr, 3, "=Scenario", "@")
-		nr += 1
-
-		score = rij.get("Score")
-		for label, waarde, fmt in (
-			(labels.COLUMN_LABELS["Score"], None if score is None or pd.isna(score) else round(float(score), 1), "0.0"),
-			(labels.COLUMN_LABELS["Robuustheid_Pct"], (rij.get("Robuustheid_Pct") or 0) / 100, stijl.FMT_PCT),
-			(labels.COLUMN_LABELS["Dealtype"], f"{rij.get('Dealtype', '-')}: {rij.get('Dealtype_Toelichting', '')}", "@"),
-			(labels.COLUMN_LABELS["Analyst_Case"], rij.get("Analyst_Case", "-"), "@"),
-		):
-			self._label(ws, nr, label, vet=label == labels.COLUMN_LABELS["Score"])
-			cel = ws.cell(row=nr, column=3, value=waarde)
-			cel.font = stijl.lettertype(vet=label == labels.COLUMN_LABELS["Score"])
-			cel.number_format = fmt
-			cel.alignment = Alignment(horizontal="left")
-			nr += 1
-
-		status_snapshot = rij.get("LBO_Snapshot_Status", "-")
-		for label, waarde in (
-			(labels.SNAPSHOT_LABEL, rij.get("LBO_Snapshot_Naam", "-")),
-			(labels.SNAPSHOT_DATE, rij.get("LBO_Snapshot_Datum", "-")),
-			(labels.SNAPSHOT_STATUS, labels.SNAPSHOT_STATUS_LABELS.get(status_snapshot, status_snapshot)),
-		):
-			self._label(ws, nr, label)
-			ws.cell(row=nr, column=3, value=waarde or "-").font = stijl.lettertype()
-			nr += 1
+		rl = self.r["lbo"]
+		lbo = lambda sleutel: f"={ZIJDE_LBO}C{rl[sleutel]}"  # noqa: E731
+		self._kop(ws, labels.TITLE_SUMMARY, "samenvatting", jaren=False)
 		ws.cell(
-			row=nr, column=1,
+			row=3, column=1,
 			value=labels.SUBTITLE_SUMMARY.format(
 				number=rij["Ondernemingsnummer"],
 				year=rij["Boekjaar"],
@@ -1494,110 +1492,229 @@ class Bouwer:
 				source=rij["LBO_Assumptie_Bron"],
 			),
 		).font = stijl.lettertype(cursief=True, grootte=8)
+		status_snapshot = rij.get("LBO_Snapshot_Status", "-")
+		for kolom, waarde in (
+			(1, labels.SNAPSHOT_LABEL),
+			(3, f"{rij.get('LBO_Snapshot_Naam') or '-'} ({rij.get('LBO_Snapshot_Datum') or '-'})"),
+			(6, labels.SNAPSHOT_STATUS),
+			(8, labels.SNAPSHOT_STATUS_LABELS.get(status_snapshot, status_snapshot)),
+		):
+			ws.cell(row=4, column=kolom, value=waarde).font = stijl.lettertype(grootte=8, vet=kolom in (1, 6))
+		nr = 5
+
+		# --- Verdict
+		self._sectie(ws, nr, labels.SECTION_VERDICT)
+		nr += 1
+		self._label(ws, nr, labels.STATUS_LABEL, vet=True)
+		ws.merge_cells(start_row=nr, start_column=3, end_row=nr, end_column=self.kol.laatste_jaar)
+		status = ws.cell(row=nr, column=3, value=rij["LBO_Status"])
+		stijl.status_kleur(status, rij["LBO_Status"])
+		status.alignment = Alignment(horizontal="center", vertical="center")
+		ws.row_dimensions[nr].height = 18
+		nr += 1
+		score = rij.get("Score")
+		score = None if score is None or pd.isna(score) else round(float(score), 1)
+		self._paar(ws, nr, labels.SUMMARY_SCORE, score if score is not None else "-", "0.0", vet=True)
+		self._paar(ws, nr, labels.SUMMARY_ROBUSTNESS, (rij.get("Robuustheid_Pct") or 0) / 100, stijl.FMT_PCT, kolom=5, waarde_kolom=8)
+		nr += 1
+		self._paar(ws, nr, labels.COLUMN_LABELS["Dealtype"], rij.get("Dealtype", "-"), "@")
+		self._paar(ws, nr, labels.COLUMN_LABELS["Analyst_Case"], rij.get("Analyst_Case", "-"), "@", kolom=5, waarde_kolom=8)
+		for kolom in (3, 8):
+			ws.cell(row=nr, column=kolom).alignment = Alignment(horizontal="right")
+		nr += 1
+
+		# Live: does the active scenario (with overrides) still work?
+		k5 = get_column_letter(self.kol.laatste_jaar)
+		werkt = (
+			f'AND({ZIJDE_LBO}C{rl["x_covenants"]}="{labels.COVENANTS_OK}",{ZIJDE_LBO}C{rl["x_irr"]}>=Target_IRR,'
+			f"{ZIJDE_LBO}{k5}{rl['d_rcf']}<=Check_Tolerance)"
+		)
+		self._label(ws, nr, labels.ACTIVE_CASE, vet=True)
+		ws.merge_cells(start_row=nr, start_column=3, end_row=nr, end_column=4)
+		actief = self._zet(
+			ws, nr, 3,
+			f'=IF({self.checks_totaal}<>"{labels.CHECK_OK}","{labels.ACTIVE_ERROR}",'
+			f'IF({werkt},"{labels.ACTIVE_WORKS}","{labels.ACTIVE_FAILS}"))',
+			"@", vet=True,
+		)
+		actief.alignment = Alignment(horizontal="center", vertical="center")
+		self.actief_cel = f"C{nr}"
+		groen = stijl.PatternFill("solid", bgColor=stijl.VULLING_OK)
+		rood = stijl.PatternFill("solid", bgColor=stijl.VULLING_FOUT)
+		ws.conditional_formatting.add(
+			self.actief_cel, CellIsRule(operator="equal", formula=[f'"{labels.ACTIVE_WORKS}"'], fill=groen, font=stijl.lettertype(stijl.GROEN, vet=True))
+		)
+		ws.conditional_formatting.add(
+			self.actief_cel, CellIsRule(operator="notEqual", formula=[f'"{labels.ACTIVE_WORKS}"'], fill=rood, font=stijl.lettertype(stijl.ROOD, vet=True))
+		)
+		self._zet(ws, nr, 5, "=Scenario", "@").alignment = Alignment(horizontal="center")
+		self._paar(ws, nr, labels.OVERRIDES_COUNT, "=Overrides_Count", "0", kolom=6, waarde_kolom=8)
+		nr += 1
+		self._breed(ws, nr, 3, labels.ACTIVE_NOTE, cursief=True, grootte=7)
+		ws.row_dimensions[nr].height = 11
+		nr += 1
+		self._label(ws, nr, labels.SUMMARY_THESIS, vet=True)
+		ws.cell(row=nr, column=1).alignment = Alignment(vertical="top")
+		self._breed(ws, nr, 3, "\n".join(f"• {punt}" for punt in (rij.get("AI_Investment_Thesis") or [])))
 		nr += 2
 
-		self._sectie(ws, nr, labels.SECTION_KEY_METRICS)
+		# --- Returns: screening case vs analyst case, plus the live active column
+		self._sectie(ws, nr, labels.SECTION_RETURNS)
+		volgorde = [s for s in assumpties.MODEL_SCENARIOS if assumpties.is_screening(s)]
+		volgorde += [s for s in assumpties.MODEL_SCENARIOS if not assumpties.is_screening(s)]
+		for index, tekst in enumerate([labels.COLUMN_ACTIVE] + [assumpties.scenario_label(s) for s in volgorde]):
+			cel = ws.cell(row=nr, column=3 + index, value=tekst)
+			cel.alignment = Alignment(horizontal="right")
 		nr += 1
-		links = [
-			("x_irr", f"={ZIJDE_LBO}C{rl['x_irr']}", stijl.FMT_PCT),
-			("x_moic", f"={ZIJDE_LBO}C{rl['x_moic']}", stijl.FMT_MULT),
-			("entry_ebitda", f"={ZIJDE_LBO}C{rl['entry_ebitda_rij']}", stijl.FMT_BEDRAG),
-			("entry_ev", f"={ZIJDE_LBO}C{rl['entry_ev_rij']}", stijl.FMT_BEDRAG),
-			("eq_price", f"={ZIJDE_LBO}C{rl['eq_price_rij']}", stijl.FMT_BEDRAG),
-			("s_equity", f"={ZIJDE_LBO}C{rl['s_equity_rij']}", stijl.FMT_BEDRAG),
-			("x_ev", f"={ZIJDE_LBO}C{rl['x_ev']}", stijl.FMT_BEDRAG),
-			("x_equity", f"={ZIJDE_LBO}C{rl['x_equity']}", stijl.FMT_BEDRAG),
-			("x_covenants", f"={ZIJDE_LBO}C{rl['x_covenants']}", "@"),
-			("x_peak_lev", f"={ZIJDE_LBO}C{rl['x_peak_lev']}", stijl.FMT_MULT),
-			("x_lev", f"={ZIJDE_LBO}C{rl['x_lev']}", stijl.FMT_MULT),
-			("x_min_dscr", f"={ZIJDE_LBO}C{rl['x_min_dscr']}", stijl.FMT_RATIO),
-			("dc_multiple", f"={ZIJDE_LBO}C{rl['dc_multiple']}", stijl.FMT_MULT),
-			("atp_multiple", f"={ZIJDE_LBO}C{rl['atp_multiple']}", stijl.FMT_MULT),
-			("atp_headroom", f"={ZIJDE_LBO}C{rl['atp_headroom']}", stijl.FMT_PCT),
+		modellen = [rij["LBO_Scenarios"][scenario] for scenario in volgorde]
+		eerste_jaar = get_column_letter(self.kol.jaren[0])
+		rcf_rij = f"{ZIJDE_LBO}{eerste_jaar}{rl['d_rcf']}:{k5}{rl['d_rcf']}"
+		metrieken = [
+			("irr", lbo("x_irr"), lambda m: m["LBO_IRR_Exact_Pct"] / 100, stijl.FMT_PCT),
+			("moic", lbo("x_moic"), lambda m: m["LBO_MoIC_Exact"], stijl.FMT_MULT),
+			("x_ebitda", lbo("x_ebitda"), lambda m: m["LBO_EBITDA_Jaar5"], stijl.FMT_BEDRAG),
+			("min_dscr", lbo("x_min_dscr"), lambda m: m["LBO_Laagste_DSCR"], stijl.FMT_RATIO),
+			("peak_lev", lbo("x_peak_lev"), lambda m: m["LBO_Hoogste_Leverage"], stijl.FMT_MULT),
+			("rcf_peak", f"=MAX({rcf_rij})", lambda m: m["LBO_RCF_Piek"], stijl.FMT_BEDRAG),
+			("rcf_exit", f"={ZIJDE_LBO}{k5}{rl['d_rcf']}", lambda m: m["LBO_RCF_Eind"], stijl.FMT_BEDRAG),
 		]
-		for sleutel, formule, fmt in links:
-			self._label(ws, nr, labels.ROW_LABELS[sleutel])
-			self._zet(ws, nr, 3, formule, fmt)
+		for sleutel, live, ophalen, fmt in metrieken:
+			self._label(ws, nr, labels.SUMMARY_LABELS[sleutel], vet=sleutel == "irr")
+			self._zet(ws, nr, 3, live, fmt, vet=sleutel == "irr")
+			for index, model in enumerate(modellen):
+				self._zet(ws, nr, 4 + index, ophalen(model), fmt, vet=sleutel == "irr")
+			nr += 1
+		self._label(ws, nr, labels.SUMMARY_LABELS["covenants"])
+		self._zet(ws, nr, 3, lbo("x_covenants"), "@")
+		for index, model in enumerate(modellen):
+			self._zet(ws, nr, 4 + index, model["LBO_Convenanten"].split(":")[0], "@")
+		for kolom in range(3, 4 + len(modellen)):
+			cel = ws.cell(row=nr, column=kolom)
+			cel.font = stijl.lettertype(cel.font.color.rgb[-6:], grootte=8)
+			cel.alignment = Alignment(horizontal="right", shrink_to_fit=True)
+		for kolom in range(3, 4 + len(modellen)):
+			ws.cell(row=nr, column=kolom).border = stijl.Border(bottom=stijl.DUN)
+		nr += 1
+		self._breed(ws, nr, 3, labels.RETURNS_NOTE, cursief=True, grootte=7)
+		ws.row_dimensions[nr].height = 11
+		nr += 2
+
+		# --- Transaction and structure: left the price, right the financing (live)
+		self._sectie(ws, nr, labels.SECTION_DEAL)
+		nr += 1
+		def getal(veld, deler=1):
+			waarde = rij.get(veld)
+			return "-" if waarde is None or pd.isna(waarde) else float(waarde) / deler
+		links = [
+			("entry_ebitda", lbo("entry_ebitda_rij"), stijl.FMT_BEDRAG),
+			("entry_multiple", "=Entry_Multiple", stijl.FMT_MULT),
+			("entry_ev", lbo("entry_ev_rij"), stijl.FMT_BEDRAG),
+			("adj_nd", lbo("adj_nd_rij"), stijl.FMT_BEDRAG),
+			("eq_price", lbo("eq_price_rij"), stijl.FMT_BEDRAG),
+			("s_equity", lbo("s_equity_rij"), stijl.FMT_BEDRAG),
+		]
+		rechts = [
+			("senior", "=Senior_Multiple", stijl.FMT_MULT),
+			("senior_type", rij.get("Senior_Type", "-"), "@"),
+			("dc", getal("Debt_Capacity_Multiple"), stijl.FMT_MULT),
+			("atp", getal("ATP_Max_Entry_Multiple"), stijl.FMT_MULT),
+			("headroom", getal("ATP_Headroom_Pct", 100), stijl.FMT_PCT),
+			("x_lev", lbo("x_lev"), stijl.FMT_MULT),
+		]
+		for (sl_l, f_l, fmt_l), (sl_r, f_r, fmt_r) in zip(links, rechts):
+			self._paar(ws, nr, labels.SUMMARY_LABELS[sl_l], f_l, fmt_l, vet=sl_l == "s_equity")
+			self._paar(ws, nr, labels.SUMMARY_LABELS[sl_r], f_r, fmt_r, kolom=5, waarde_kolom=8)
 			nr += 1
 		nr += 1
 
-		self._sectie(ws, nr, labels.SECTION_SCORECARD)
+		# --- Scorecard with data bars
+		self._sectie(ws, nr, labels.SECTION_SUMMARY_SCORECARD)
 		for kolom, tekst in ((3, labels.SCORE_HEADER_SCORE), (4, labels.SCORE_HEADER_WEIGHT), (5, labels.SCORE_HEADER_REASON)):
-			ws.cell(row=nr, column=kolom, value=tekst)
+			ws.cell(row=nr, column=kolom, value=tekst).alignment = Alignment(horizontal="left" if kolom == 5 else "center")
 		nr += 1
+		eerste = nr
 		for component in rij.get("Score_Componenten") or []:
 			self._label(ws, nr, component["label"])
 			self._zet(ws, nr, 3, round(component["score"], 1), "0", soort="invoer")
-			self._zet(ws, nr, 4, component["gewicht"], stijl.FMT_PCT, soort="invoer")
-			ws.cell(row=nr, column=5, value=component["reden"]).font = stijl.lettertype(grootte=8)
+			self._zet(ws, nr, 4, component["gewicht"], "0%", soort="invoer").alignment = Alignment(horizontal="center")
+			self._breed(ws, nr, 5, component["reden"], grootte=8)
+			nr += 1
+		if nr > eerste:
+			ws.conditional_formatting.add(
+				f"C{eerste}:C{nr - 1}",
+				DataBarRule(start_type="num", start_value=0, end_type="num", end_value=100, color="5B9BD5", showValue=True),
+			)
+		nr += 1
+
+		# --- Top risks and DD questions
+		self._sectie(ws, nr, labels.SECTION_TOP_RISKS)
+		nr += 1
+		vlaggen = [vlag for vlag in (rij.get("Red_Flag_Lijst") or [])][:5]
+		for vlag in vlaggen:
+			self._label(ws, nr, labels.FLAG_CATEGORIES.get(vlag["categorie"], vlag["categorie"]))
+			ws.cell(row=nr, column=1).alignment = Alignment(vertical="top")
+			ernst = ws.cell(row=nr, column=3, value=labels.SEVERITIES.get(vlag["ernst"], vlag["ernst"]))
+			ernst.font = stijl.lettertype(stijl.ERNST_KLEUR.get(vlag["ernst"], stijl.ZWART), vet=True, grootte=8)
+			ernst.alignment = Alignment(horizontal="center", vertical="top")
+			bron = ws.cell(row=nr, column=4, value=vlag["bron"])
+			bron.font = stijl.lettertype(grootte=8, cursief=True)
+			bron.alignment = Alignment(horizontal="center", vertical="top")
+			self._breed(ws, nr, 5, vlag["tekst"], grootte=8)
+			nr += 1
+		if not vlaggen:
+			ws.cell(row=nr, column=1, value=labels.NO_RISKS).font = stijl.lettertype(cursief=True)
+			nr += 1
+		nr += 1
+		self._sectie(ws, nr, labels.SECTION_DD)
+		nr += 1
+		vragen = (rij.get("AI_DD_Vragen") or [])[:5]
+		for index, vraag in enumerate(vragen, start=1):
+			cel = ws.cell(row=nr, column=1, value=f"{index}. {vraag.get('gekoppeld_aan', '')}")
+			cel.font = stijl.lettertype(grootte=8)
+			cel.alignment = Alignment(vertical="top", wrap_text=True)
+			self._breed(ws, nr, 3, vraag["vraag"], grootte=8)
+			nr += 1
+		if not vragen:
+			ws.cell(row=nr, column=1, value=labels.NO_DD).font = stijl.lettertype(cursief=True)
 			nr += 1
 		nr += 1
 
+		# --- Multi-year overview of the active scenario
 		self._sectie(ws, nr, labels.SECTION_TREND)
 		nr += 1
+		self._jaarkoppen(ws, nr)
+		nr += 2
 		trend = [
 			("rev", "model", stijl.FMT_BEDRAG),
 			("a_groei", "model", stijl.FMT_PCT),
 			("ebitda", "model", stijl.FMT_BEDRAG),
 			("a_marge", "model", stijl.FMT_PCT),
-			("ni", "model", stijl.FMT_BEDRAG),
 			("w_fcf", "lbo", stijl.FMT_BEDRAG),
-			("cash", "model", stijl.FMT_BEDRAG),
-			("senior", "model", stijl.FMT_BEDRAG),
-			("rcf", "model", stijl.FMT_BEDRAG),
-			("nd_bank", "lbo", stijl.FMT_BEDRAG),
 			("c_lev", "lbo", stijl.FMT_MULT),
 			("c_dscr", "lbo", stijl.FMT_RATIO),
-			("c_icr", "lbo", stijl.FMT_RATIO),
 		]
 		for sleutel, blad, fmt in trend:
 			zijde = ZIJDE_MODEL if blad == "model" else ZIJDE_LBO
 			rijen = self.r[blad]
 			self._label(ws, nr, labels.ROW_LABELS[sleutel])
-			kolommen = self.kol.alle if blad == "model" and sleutel not in ("rcf", "senior") else self.kol.jaren
-			for kolom in kolommen:
-				if kolom == self.kol.closing and sleutel not in ("cash", "senior", "rcf"):
+			for kolom in self.kol.alle:
+				if kolom == self.kol.closing:
 					continue
 				bron = (self.ws_model if blad == "model" else self.ws_lbo).cell(row=rijen[sleutel], column=kolom)
 				if bron.value is not None:
 					self._zet(ws, nr, kolom, f"={zijde}{get_column_letter(kolom)}{rijen[sleutel]}", fmt)
 			self._grijs(ws, nr)
 			nr += 1
-		nr += 1
+		self._voet(ws, nr + 1)
+		self.samenvatting_einde = nr + 5
+		ws.print_area = f"A1:{get_column_letter(self.kol.laatste_jaar)}{self.samenvatting_einde}"
+		ws.sheet_properties.pageSetUpPr.fitToPage = True
 
-		self._sectie(ws, nr, labels.SECTION_SCENARIOS)
-		nr += 1
-		for index, scenario in enumerate(assumpties.MODEL_SCENARIOS):
-			cel = ws.cell(row=nr, column=3 + index, value=assumpties.scenario_label(scenario))
-			cel.font = stijl.lettertype(vet=True)
-			cel.alignment = Alignment(horizontal="center", wrap_text=True)
-		notitie = 3 + len(assumpties.MODEL_SCENARIOS)
-		ws.cell(row=nr, column=notitie, value=labels.SCENARIO_NOTE).font = stijl.lettertype(cursief=True, grootte=8)
-		nr += 1
-		modellen = [rij["LBO_Scenarios"][scenario] for scenario in assumpties.MODEL_SCENARIOS]
-		metrieken = [
-			("x_irr", lambda m: m["LBO_IRR_Exact_Pct"] / 100, stijl.FMT_PCT),
-			("x_moic", lambda m: m["LBO_MoIC_Exact"], stijl.FMT_MULT),
-			("x_ebitda", lambda m: m["LBO_EBITDA_Jaar5"], stijl.FMT_BEDRAG),
-			("x_min_dscr", lambda m: m["LBO_Laagste_DSCR"], stijl.FMT_RATIO),
-			("x_peak_lev", lambda m: m["LBO_Hoogste_Leverage"], stijl.FMT_MULT),
-			("rcf_peak", lambda m: m["LBO_RCF_Piek"], stijl.FMT_BEDRAG),
-			("rcf_exit", lambda m: m["LBO_RCF_Eind"], stijl.FMT_BEDRAG),
-		]
-		for sleutel, ophalen, fmt in metrieken:
-			self._label(ws, nr, labels.ROW_LABELS[sleutel])
-			for index, model in enumerate(modellen):
-				self._zet(ws, nr, 3 + index, ophalen(model), fmt)
-			nr += 1
-		self._label(ws, nr, labels.ROW_LABELS["x_covenants"])
-		for index, model in enumerate(modellen):
-			waarde = model["LBO_Convenanten"].split(":")[0]
-			cel = ws.cell(row=nr, column=3 + index, value=waarde)
-			cel.font = stijl.lettertype(stijl.BLAUW)
-			cel.alignment = Alignment(horizontal="right")
-		nr += 2
-
-		nr = self._schrijf_teksten(ws, nr)
+	def schrijf_risico(self):
+		"""Risks & Adjustments: the long text blocks that do not fit on the one-pager."""
+		ws = self.ws_risico
+		self._kop(ws, labels.TITLE_RISKS, "risico", jaren=False)
+		nr = self._schrijf_teksten(ws, 4)
 		self._voet(ws, nr + 1)
 
 	def _schrijf_teksten(self, ws, nr):
@@ -1656,6 +1773,7 @@ class Bouwer:
 			},
 			"scenario_cel": f"C{self.scenario_rij}",
 			"overrides_cel": self.overrides_cel,
+			"actief_cel": self.actief_cel,
 			"checks_cel": self.checks_totaal,
 		}
 
@@ -1670,10 +1788,12 @@ def bouw_werkboek(rij, historiek):
 	bouwer.schrijf_model()
 	bouwer.schrijf_lbo()
 	bouwer.schrijf_samenvatting()
+	bouwer.schrijf_risico()
 	bouwer.schrijf_namen()
 	for ws in (bouwer.ws_inp, bouwer.ws_model, bouwer.ws_lbo):
 		stijl.afdruk(ws, rij["Bedrijfsnaam"])
-	stijl.afdruk(bouwer.ws_samenvatting, rij["Bedrijfsnaam"], titelkolommen=None)
+	stijl.afdruk(bouwer.ws_risico, rij["Bedrijfsnaam"], titelrijen="1:2", titelkolommen=None)
+	stijl.afdruk(bouwer.ws_samenvatting, rij["Bedrijfsnaam"], titelrijen=None, titelkolommen=None, een_pagina=True)
 	return bouwer.wb, bouwer.kaart()
 
 
@@ -1681,7 +1801,7 @@ def bouw_lege_fiche(rij, historiek):
 	"""A company without a calculable LBO: the message, the actuals and the text blocks."""
 	bouwer = Bouwer(rij, historiek)
 	ws = bouwer.ws_samenvatting
-	for naam in (labels.TAB_INPUTS, labels.TAB_MODEL, labels.TAB_LBO):
+	for naam in (labels.TAB_INPUTS, labels.TAB_MODEL, labels.TAB_LBO, labels.TAB_RISKS):
 		del bouwer.wb[naam]
 	ws.sheet_view.showGridLines = False
 	ws.column_dimensions["A"].width = 52
