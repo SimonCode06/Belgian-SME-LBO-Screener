@@ -264,7 +264,7 @@ def _rijen_model():
 		Rij(
 			"oth_nonop",
 			hist=lambda r: _waarde(r, "Overige_Activa_Niet_Operationeel"),
-			closing=lambda c: f"={c.a('oth_nonop')}",
+			closing=lambda c: f"={c.a('oth_nonop')}-Intercompany_Settled",
 			jaar=constant("oth_nonop"),
 		),
 		Rij(
@@ -609,6 +609,7 @@ def _enkelvoudig_lbo(rij):
 		("fin_debt", "Financial_Debt", "f", lambda c: f"={c.xa('exist_debt')}", stijl.FMT_BEDRAG, "normaal"),
 		("cash_br", "Cash_At_Signing", "i", float(rij["Liquide_Middelen"]), stijl.FMT_BEDRAG, "normaal"),
 		("debt_like", "Debt_Like_Items", "i", float(rij["Debt_Like_Items"]), stijl.FMT_BEDRAG, "normaal"),
+		("ic_cash", "Intercompany_Settled", "i", float(rij["Intercompany_Cash_Like"]), stijl.FMT_BEDRAG, "normaal"),
 		(
 			"min_req", "Min_Cash_Requirement", "f",
 			lambda c: (
@@ -629,7 +630,7 @@ def _enkelvoudig_lbo(rij):
 			"adj_nd", "Adjusted_Net_Debt", "f",
 			lambda c: (
 				"=Financial_Debt+IF(Val_Debt_Like=1,Debt_Like_Items,0)"
-				"-IF(Val_Excess_Only=1,Cash_At_Signing-Min_Cash,Cash_At_Signing)"
+				"-IF(Val_Excess_Only=1,Cash_At_Signing-Min_Cash,Cash_At_Signing)-Intercompany_Settled"
 			),
 			stijl.FMT_BEDRAG, "subtotaal",
 		),

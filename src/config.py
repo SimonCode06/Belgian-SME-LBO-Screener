@@ -153,6 +153,15 @@ MIN_CASH_MAANDEN_PERSONEEL = 1   # Maanden loon en RSZ (code 62)
 MIN_CASH_WEKEN_LEVERANCIERS = 2  # Weken leveranciersbetalingen
 MIN_CASH_BETAALTERMIJN_DAGEN = 60  # Handelsschulden = aankopen van zoveel dagen (wettelijk maximum B2B)
 MAX_GROEPSVORDERINGEN_PCT = 25.0 # Red flag als vorderingen op verbonden ondernemingen dit % van de balans overschrijden
+# Groepsvorderingen (9291) die in de overige vorderingen (41) zitten, bv. een cash pool:
+# - "cash_like": vereffend vóór closing. De verkoper krijgt ze betaald (aftrek in de Adjusted Net Debt) en ze
+#   verdwijnen uit de openingsbalans. Zo werkt een cash pool bij een carve-out.
+# - "operationeel": ze blijven in de overige operationele activa en groeien mee met de omzet.
+# - "buiten_waarde": ze blijven als niet-operationeel actief staan zonder waarde voor de verkoper (oud gedrag).
+# Het deel van 9291 dat niet in 41 past, zit in de handelsvorderingen (40) en blijft werkkapitaal.
+# Schulden aan verbonden ondernemingen (9351) worden niet apart debt-like gemaakt: ze zitten al in de
+# financiële schulden (170/4, 42, 43), de handelsschulden (44) of de overige schulden (47/48, al debt-like).
+INTERCOMPANY_BEHANDELING = "cash_like"
 
 # Modelcode in de CSV -> schema. Alleen codes die in echte neerleggingen zijn vastgesteld;
 # andere modellen worden herkend aan hun rubrieken (zie Neerlegging.schema).

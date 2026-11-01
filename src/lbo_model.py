@@ -323,7 +323,8 @@ def bereken_lbo(rij, scenario="base"):
 	overige_activa_0 = posten["Overige_Activa_Operationeel"]
 	sociale_schulden_0 = posten["Sociale_Schulden"]
 	overige_passiva_0 = posten["Overige_Passiva"]
-	niet_operationeel = float(rij["Open_Overige_Activa_Niet_Operationeel"])
+	# Groepsvorderingen die vóór closing vereffend worden, staan niet meer op de openingsbalans
+	niet_operationeel = float(rij["Open_Overige_Activa_Niet_Operationeel"]) - float(rij.get("Open_Intercompany_Cash_Like", 0.0))
 	financiele_activa = float(rij["Open_Financiele_Vaste_Activa"])
 
 	netto_activa = (

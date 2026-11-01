@@ -171,13 +171,15 @@ def bouw_dataframe(resultaten):
     df["Net_Debt"] = net_debt(
         "bank_covenant", df["Totale_Financiele_Schuld"], df["Liquide_Middelen"], df["Minimum_Operationele_Cash"]
     )
+    # Groepsvorderingen in 41 die vóór closing vereffend worden (config.INTERCOMPANY_BEHANDELING = "cash_like")
+    df["Intercompany_Cash_Like"] = pd.to_numeric(df["Open_Intercompany_Cash_Like"]).fillna(0.0)
     df["Adjusted_Net_Debt"] = net_debt(
         "waardering",
         df["Totale_Financiele_Schuld"],
         df["Liquide_Middelen"],
         df["Minimum_Operationele_Cash"],
         df["Debt_Like_Items"],
-    )
+    ) - df["Intercompany_Cash_Like"]
     df["Trade_Working_Capital"] = (
         df["Voorraden"]
         + df["Handelsvorderingen"]
@@ -431,6 +433,7 @@ def bouw_dataframe(resultaten):
         "Belasting_en_Vervallen_RSZ_Schulden",
         "Overige_Schulden_LT_en_KT",
         "Debt_Like_Items",
+        "Intercompany_Cash_Like",
         "Minimum_Cash_Behoefte",
         "Minimum_Operationele_Cash",
         "Adjusted_Net_Debt",
@@ -438,6 +441,7 @@ def bouw_dataframe(resultaten):
         "Memo_Zekerheden_Derden",
         "Memo_Vorderingen_Bestuurders",
         "Memo_Vorderingen_Verbonden",
+        "Memo_Schulden_Verbonden",
         "Voorraden",
         "Handelsvorderingen",
         "Handelsschulden",
@@ -467,6 +471,7 @@ def bouw_dataframe(resultaten):
         "Open_Financiele_Vaste_Activa",
         "Open_Overige_Activa_Operationeel",
         "Open_Overige_Activa_Niet_Operationeel",
+        "Open_Intercompany_Cash_Like",
         "Open_Sociale_Schulden",
         "Open_Overige_Passiva",
         "Instap_Multiple",

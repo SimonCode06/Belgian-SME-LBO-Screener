@@ -393,15 +393,21 @@ def _balansregels(neerlegging):
 	overige_passiva = (
 		neerlegging.waarde("10/49") - neerlegging.waarde("10/15", "170/4", "42", "43", "44", "46") - debt_like
 	)
-	# Groepsvorderingen en vorderingen op bestuurders zijn geen werkkapitaal: ze groeien niet mee met de omzet
-	niet_operationeel = _of_nul(neerlegging.memo("9291")) + _of_nul(neerlegging.memo("9500"))
-	niet_operationeel = min(niet_operationeel, neerlegging.bedrag("41"), max(overige_activa, 0.0))
+	# Groepsvorderingen en vorderingen op bestuurders in de overige vorderingen (41) zijn geen werkkapitaal.
+	# Eerst de groepsvorderingen, dan die op bestuurders, samen nooit meer dan 41 en de overige activa.
+	ruimte = min(neerlegging.bedrag("41"), max(overige_activa, 0.0))
+	intercompany = min(_of_nul(neerlegging.memo("9291")), ruimte)
+	bestuurders = min(_of_nul(neerlegging.memo("9500")), ruimte - intercompany)
+	behandeling = config.INTERCOMPANY_BEHANDELING
+	niet_operationeel = bestuurders + (0.0 if behandeling == "operationeel" else intercompany)
 	# Vervallen sociale schulden (9076) zitten bij de debt-like items
 	sociaal = _of_nul(neerlegging.waarde("454/9")) - neerlegging.bedrag("9076")
 	sociaal = min(max(sociaal, 0.0), max(overige_passiva, 0.0))
 	return {
 		"overige_activa": overige_activa,
 		"niet_operationeel": niet_operationeel,
+		# Alleen bij cash_like: vereffend vóór closing, dus uit de openingsbalans en in de bridge
+		"intercompany_cash_like": intercompany if behandeling == "cash_like" else 0.0,
 		"overige_passiva": overige_passiva,
 		"sociaal": sociaal,
 		"debt_like": debt_like,
@@ -477,6 +483,7 @@ def _openingsposten(huidig):
 		"Open_Financiele_Vaste_Activa": huidig.waarde("28"),
 		"Open_Overige_Activa_Operationeel": regels["overige_activa"] - regels["niet_operationeel"],
 		"Open_Overige_Activa_Niet_Operationeel": regels["niet_operationeel"],
+		"Open_Intercompany_Cash_Like": regels["intercompany_cash_like"],
 		"Open_Sociale_Schulden": regels["sociaal"],
 		"Open_Overige_Passiva": regels["overige_passiva"] - regels["sociaal"],
 	}
@@ -561,6 +568,7 @@ def bouw_cijfers(neerleggingen):
 		"Memo_Zekerheden_Derden": huidig.memo("9149", "9381"),
 		"Memo_Vorderingen_Bestuurders": huidig.memo("9500"),
 		"Memo_Vorderingen_Verbonden": huidig.memo("9291"),
+		"Memo_Schulden_Verbonden": huidig.memo("9351"),
 		**_bereken_drivers(reeks, omzet_code),
 		**_openingsposten(huidig),
 		"Data_Volledigheid": _data_volledigheid(huidig, vorig, omzet_code, len(reeks)),
