@@ -130,6 +130,10 @@ class AssumptieAntwoord(BaseModel):
 	"""The full response of Gemini: a flat list, because the API refuses a schema nested per scenario."""
 
 	regels: list[AssumptieRegel]
+	business_model: str = Field(
+		default="",
+		description="One sentence, in English: how the company earns its revenue (what it sells, to whom, how it is billed).",
+	)
 
 	@model_validator(mode="after")
 	def elke_combinatie_precies_een_keer(self):
@@ -257,6 +261,46 @@ def impliciete_groei_en_marge(drivers, omzet_0, personeel_0):
 	return groei, marges
 
 
+def impliciete_ebitda(drivers, omzet_0, personeel_0):
+	"""EBITDA per full year that follows from the drivers of one scenario (same recursion as the model)."""
+	omzet, personeel = omzet_0, personeel_0
+	reeks = []
+	for jaar in range(JAREN):
+		volume = drivers["volumegroei"]["waarden"][jaar] / 100
+		prijs = drivers["prijsgroei"]["waarden"][jaar] / 100
+		omzet = omzet * (1 + volume) * (1 + prijs)
+		personeel = personeel * (1 + volume * drivers["vte_elasticiteit"]["waarden"][jaar])
+		personeel *= 1 + drivers["loonindexering"]["waarden"][jaar] / 100
+		kosten_pct = (drivers["inkoop_pct"]["waarden"][jaar] + drivers["overige_kosten_pct"]["waarden"][jaar]) / 100
+		reeks.append(omzet * (1 - kosten_pct) - personeel)
+	return reeks
+
+
+def _ebitda_vlaggen(pack, omzet_0, personeel_0, ebitda_0, hist_ebitda_cagr):
+	"""(1) Downside Y5 EBITDA below half of Base Y5: not a credible setback.
+	(2) Base EBITDA CAGR far above the historical EBITDA CAGR: a hockey stick."""
+	vlaggen = []
+	base = impliciete_ebitda(pack["base"], omzet_0, personeel_0)
+	downside = impliciete_ebitda(pack["downside"], omzet_0, personeel_0)
+	if base[-1] > 0 and downside[-1] < config.LBO_VLAG_DOWNSIDE_MIN_DEEL_BASE * base[-1]:
+		vlaggen.append((
+			"downside",
+			"overige_kosten_pct",
+			labels.ASSUMPTION_FLAG_DOWNSIDE_DEPTH.format(
+				down=downside[-1], base=base[-1], pct=config.LBO_VLAG_DOWNSIDE_MIN_DEEL_BASE * 100
+			),
+		))
+	if ebitda_0 is not None and ebitda_0 > 0 and base[-1] > 0 and hist_ebitda_cagr is not None and not math.isnan(hist_ebitda_cagr):
+		cagr = ((base[-1] / ebitda_0) ** (1 / JAREN) - 1) * 100
+		if cagr > hist_ebitda_cagr + config.LBO_VLAG_EBITDA_CAGR_PP:
+			vlaggen.append((
+				"base",
+				"volumegroei",
+				labels.ASSUMPTION_FLAG_EBITDA_CAGR.format(ai=cagr, hist=hist_ebitda_cagr, pp=config.LBO_VLAG_EBITDA_CAGR_PP),
+			))
+	return vlaggen
+
+
 def _jaren_tekst(jaren):
 	return ", ".join(f"Y{jaar}" for jaar in jaren)
 
@@ -306,7 +350,7 @@ def _volgorde_vlaggen(pack):
 	return vlaggen
 
 
-def controleer(pack, pack_jaren, omzet_0, personeel_0):
+def controleer(pack, pack_jaren, omzet_0, personeel_0, ebitda_0=None, hist_ebitda_cagr=None):
 	"""Adds soft flags to the pack. No value is ever changed. Returns the flags as readable lines."""
 	for scenario in SCENARIOS:
 		for driver in DRIVERS:
@@ -318,7 +362,9 @@ def controleer(pack, pack_jaren, omzet_0, personeel_0):
 				if vlag:
 					voorstel["vlaggen"].append(vlag)
 
-	for scenario, sleutel, tekst in _volgorde_vlaggen(pack):
+	for scenario, sleutel, tekst in _volgorde_vlaggen(pack) + _ebitda_vlaggen(
+		pack, omzet_0, personeel_0, ebitda_0, hist_ebitda_cagr
+	):
 		pack[scenario][sleutel]["vlaggen"].append(tekst)
 
 	# Derived checks: the flag sits next to the driver that moves the result most
@@ -374,7 +420,7 @@ def schrijf_snapshot(pad, data, pdf, bedrijf):
 			"pdf_bestand": pdf.name if pdf is not None else None,
 			"pdf_sha256": bestand_hash(pdf),
 		},
-		"assumpties": {"regels": data["regels"]},
+		"assumpties": {"regels": data["regels"], "business_model": data.get("business_model", "")},
 	}
 	pad.write_text(json.dumps(inhoud, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -403,4 +449,5 @@ def snapshot_info(pad, metadata):
 		"naam": pad.name,
 		"datum": str(metadata.get("datum", "")),
 		"status": str(metadata.get("status", SNAPSHOT_VOORSTEL)),
+		"business_model": "",
 	}

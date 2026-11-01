@@ -23,9 +23,9 @@ from pathlib import Path
 import pytest
 
 import main as app
-from src.assumpties import AssumptieAntwoord, pack_uit_antwoord
+from src.assumpties import SCENARIOS, AssumptieAntwoord, pack_uit_antwoord
 from src.calculations import bouw_dataframe
-from src import labels
+from src import citaten, labels
 from src.nbb_csv import bouw_cijfers, bouw_driver_pack, groepeer_per_bedrijf, lees_neerlegging
 from tests.conftest import TEKSTVELDEN
 from tests.test_assumpties import nagebootste_gemini_respons
@@ -89,6 +89,10 @@ def kerncijfers(rij):
 			for naam, model in rij["LBO_Scenarios"].items()
 		},
 		"Aantal_Red_Flags": len(flags),
+		"Eigendom": rij["Eigendom"],
+		"Citaten": sorted(
+			f"{item['categorie']}: {item['citaat_status']}" for item in [*rij["AI_Normalisaties"], *rij["AI_Red_Flags"]]
+		),
 	}
 
 
@@ -141,15 +145,18 @@ def _cloudar_rij():
 	bedrijf = groepeer_per_bedrijf([lees_neerlegging(pad) for pad in csvs])[0]
 	cijfers = bouw_cijfers(bedrijf)
 
+	paginas = citaten.pdf_paginas(BASELINE_LOKAAL / "Cloudar.pdf")
 	tekst = json.loads((BASELINE_LOKAAL / "cloudar_tekst.json").read_text(encoding="utf-8"))
-	velden = app.koppel_tekst(cijfers, tekst)
+	velden = app.koppel_tekst(cijfers, tekst, bedrijf[-1].codes, paginas)
 
 	data = json.loads((BASELINE_LOKAAL / "cloudar_assumpties.json").read_text(encoding="utf-8"))
 	antwoord = AssumptieAntwoord.model_validate({k: v for k, v in data.items() if k != "Gebruikt_Model"})
+	pack = pack_uit_antwoord(antwoord)
+	citaten.controleer_assumpties(pack, paginas, SCENARIOS)
 	return {
 		**cijfers,
 		**velden,
-		"LBO_Assumpties": pack_uit_antwoord(antwoord),
+		"LBO_Assumpties": pack,
 		"LBO_Assumptie_Bron": labels.ASSUMPTIONS_AI,
 		"LBO_Driver_Pack": bouw_driver_pack(bedrijf),
 	}

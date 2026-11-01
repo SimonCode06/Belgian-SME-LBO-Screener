@@ -1324,7 +1324,16 @@ class Bouwer:
 		rij = self.rij
 		self._sectie(ws, nr, labels.SECTION_TEXT)
 		nr += 1
+		thesis = "\n".join(f"\u2022 {punt}" for punt in (rij.get("AI_Investment_Thesis") or []))
+		vragen = "\n".join(
+			f"{index}. {vraag['vraag']} ({labels.DD_LINKED_TO}: {vraag['gekoppeld_aan']})"
+			for index, vraag in enumerate(rij.get("AI_DD_Vragen") or [], start=1)
+		)
 		blokken = [
+			(labels.COLUMN_LABELS["Eigendom"], rij.get("Eigendom", "")),
+			(labels.COLUMN_LABELS["AI_Business_Model"], rij.get("AI_Business_Model", "")),
+			(labels.COLUMN_LABELS["AI_Investment_Thesis"], thesis),
+			(labels.COLUMN_LABELS["AI_DD_Vragen"], vragen),
 			(labels.COLUMN_LABELS["Commissaris_Oordeel"], rij.get("Commissaris_Oordeel", "")),
 			(labels.COLUMN_LABELS["Normalisatie_Toelichting"], rij.get("Normalisatie_Toelichting", "")),
 			(labels.COLUMN_LABELS["Normalisatie_Voorstellen"], rij.get("Normalisatie_Voorstellen", "")),
@@ -1346,7 +1355,7 @@ class Bouwer:
 			cel = ws.cell(row=nr, column=3, value=tekst)
 			cel.font = stijl.lettertype()
 			cel.alignment = Alignment(vertical="top", wrap_text=True)
-			regels = max(1, int(len(tekst) / breedte_tekens) + 1)
+			regels = sum(max(1, int(len(deel) / breedte_tekens) + 1) for deel in tekst.split("\n"))
 			ws.row_dimensions[nr].height = max(16, 14 * regels + 2)
 			nr += 1
 		return nr

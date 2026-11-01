@@ -19,6 +19,7 @@ from google.genai import errors, types
 
 from . import config, labels
 from .assumpties import AssumptieAntwoord, driver_uitleg
+from .tekst_schema import OordeelAntwoord, TekstAntwoord
 
 
 def parse_json_antwoord(tekst, sleutels):
@@ -152,7 +153,7 @@ def analyseer_tekst(client, pdf_pad, cijfers):
 	"""Eerste pass: de tekst uit de PDF, vóór de berekening."""
 	pdf_deel, upload_naam = bouw_pdf_part(client, pdf_pad)
 	try:
-		return _vraag_gemini(client, [pdf_deel, bouw_prompt(cijfers)], config.VERWACHTE_SLEUTELS)
+		return _vraag_gemini(client, [pdf_deel, bouw_prompt(cijfers)], (), schema=TekstAntwoord)
 	finally:
 		if upload_naam:
 			try:
@@ -182,4 +183,4 @@ def genereer_assumpties(client, pdf_pad, driver_pack):
 
 def schrijf_oordeel(client, rij):
 	"""Tweede pass: de toelichting op de resultaten, na de berekening. De PDF is niet meer nodig."""
-	return _vraag_gemini(client, [bouw_oordeel_prompt(rij)], config.OORDEEL_SLEUTELS)
+	return _vraag_gemini(client, [bouw_oordeel_prompt(rij)], (), schema=OordeelAntwoord)

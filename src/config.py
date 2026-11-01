@@ -95,6 +95,8 @@ LBO_VLAG_OMZETGROEI = (-25.0, 25.0)   # Omzetgroei per jaar, in procentpunt
 LBO_VLAG_EBITDA_MARGE = (0.0, 60.0)   # EBITDA-marge per jaar, in procentpunt
 LBO_VLAG_MARGE_PP = 3.0               # Procentpunt buiten de historische min/max
 LBO_VLAG_MARGE_DAGEN = 15.0           # Dagen buiten de historische min/max (DSO, DIO, DPO, vooruitbetalingen)
+LBO_VLAG_DOWNSIDE_MIN_DEEL_BASE = 0.50 # AI-downside EBITDA jaar 5 onder dit deel van de AI-base: geen geloofwaardige tegenvaller
+LBO_VLAG_EBITDA_CAGR_PP = 10.0        # AI-base EBITDA-CAGR meer dan zoveel pp boven de historische EBITDA-CAGR
 
 # Net debt: één definitie per doel, berekend door lbo_model.net_debt en beschreven in de Excel.
 # Financiële schuld is altijd senior + RCF + vendor loan.
@@ -170,13 +172,14 @@ RETRYABLE_CODES = {429, 500, 502, 503, 504}
 # Versies van de AI-input, onderdeel van elke cachesleutel. Verhoog PROMPT_VERSIE bij elke bewuste
 # wijziging van een prompt en SCHEMA_VERSIE bij elke wijziging van het antwoordschema
 # (assumpties.AssumptieAntwoord). Een pakketupdate (bv. pydantic) verandert de sleutel zo nooit.
-PROMPT_VERSIE = "2026-11-a"
-SCHEMA_VERSIE = 1
+PROMPT_VERSIE = "2026-11-b"
+SCHEMA_VERSIE = 2
 
 SYSTEEM_PROMPT = """
 You are an experienced Belgian M&A and Private Equity analyst. You receive an NBB
 annual report as a PDF and the figures from the structured filing. The PDF may be
-in Dutch or French. Always answer in English.
+in Dutch or French. Write every description in English; quotes stay in the language
+of the PDF.
 
 Those figures are final. Do not extract amounts from the financial statements again
 and do not calculate EBITDA, debt or ratios. The value null means the figure is not
@@ -184,33 +187,34 @@ available: do not fill it in yourself. Your task is the text only: the notes, th
 valuation rules, the statutory auditor's report, the annual report and the
 off-balance-sheet commitments.
 
-Return only a valid JSON object with exactly these keys:
-{
-  "Ondernemingsnummer": "Enterprise number on the PDF, as 0xxx.xxx.xxx",
-  "Boekjaar": "Year of the end date of the fiscal year on the PDF",
-  "Normalisatie_Voorstellen": "Possible further EBITDA adjustments",
-  "Commissaris_Oordeel": "Exactly one of: Unqualified, Qualified, Disclaimer of Opinion, Adverse, No Statutory Auditor, Unknown",
-  "Buitenbalans_Verplichtingen": "Commitments not on the balance sheet",
-  "Red_Flags": "Points of attention from the text"
-}
+The answer follows a fixed JSON schema. For every item give the PDF page number (the
+page of the PDF file, starting at 1) and a short literal quote of 5 to 25 words copied
+exactly from that page. Python checks every quote against the PDF: an item whose
+quote cannot be found is treated as unverified.
 
-Instructions:
-- Normalisatie_Voorstellen: the typical SME adjustments. For each proposal, name the
-  item, the amount if it is in the PDF and where it was found (for example the section
-  on directors or related parties). Think of director pay or management fees versus
-  market level, rent paid to a property vehicle of the owner, private expenses and
-  non-recurring items outside codes 66A and 76A. Codes 66A and 76A are already
-  processed: do not propose them again. Write 'None' if there is nothing. These
-  proposals are not added to EBITDA automatically; an analyst reviews them.
-- Commissaris_Oordeel: the type of opinion in the statutory auditor's report. An opinion
-  with an emphasis of matter or a stated uncertainty remains 'Unqualified'. Write
+Fields:
+- ondernemingsnummer, boekjaar: as printed on the PDF (0xxx.xxx.xxx and the year of the
+  end date of the fiscal year).
+- commissaris_oordeel: the type of opinion in the statutory auditor's report. An opinion
+  with an emphasis of matter or a stated uncertainty remains 'Unqualified'. Use
   'No Statutory Auditor' if there is no report.
-- Buitenbalans_Verplichtingen: operating leases, rental commitments, guarantees and
-  other items from the section on rights and commitments not on the balance sheet,
-  with amounts. Write 'None' if there is nothing.
-- Red_Flags: think of receivables from and transactions with related parties and
-  directors, doubts about going concern, mergers or liquidation, disputes and
-  dependence on customers or individuals.
+- normalisaties: the typical SME adjustments to EBITDA, one item each. Categories:
+  bestuurdersvergoeding (director pay or management fees versus market level),
+  huur_verbonden_partij (rent paid to a property vehicle of the owner), privekosten,
+  eenmalig (non-recurring items outside codes 66A and 76A, which are already processed),
+  subsidie, overig. richting: '+' if the item is added back to EBITDA, '-' if deducted.
+  bedrag_eur: the amount if the PDF states it, else null. nbb_code: the NBB code of the
+  amount if there is one (for example 9503 for director remuneration), else null. An
+  empty list if there is nothing. These proposals are not added to EBITDA automatically.
+- red_flags: points of attention from the text. Categories: governance, verbonden_partijen
+  (receivables from and transactions with related parties and directors), going_concern,
+  juridisch (disputes, conflicts of interest), klantconcentratie, personeel, overig.
+  ernst: hoog (could stop a deal), middel (to price or protect in the SPA), laag (note).
+- eigendom: who controls the company. type: zelfstandig, groepsdochter, pe_backed or
+  onbekend; the parent company and its enterprise number if stated; consoliderend:
+  whether the company is included in consolidated group accounts (ja, nee, onbekend).
+- buitenbalans: operating leases, rental commitments, guarantees and other rights and
+  commitments not on the balance sheet, with the amount if stated.
 - Mention only what is in the PDF. Do not invent anything.
 """
 
@@ -240,43 +244,49 @@ Rules:
 - confidence: low, medium or high.
 - On a gross margin basis (Omzet_Basis in the driver pack) inkoop_pct must be 0 in every
   year, because purchases are already deducted from the revenue line.
+- Use the Economics block of the driver pack. EBITDA_Sensitivity_Per_1pp_Cost_Pct is the
+  share of EBITDA that one percentage point of revenue in costs takes away. A downside
+  that removes more than half of the EBITDA is not a credible setback.
+- business_model: one sentence on how the company earns its revenue (what it sells, to
+  whom, how it is billed), from the PDF.
 - Do not invent facts about the company.
 """
 
 ASSUMPTIE_BRON_HISTORIEK = "historical trend"
 
-VERWACHTE_SLEUTELS = [
-	"Ondernemingsnummer",
-	"Boekjaar",
-	"Normalisatie_Voorstellen",
-	"Commissaris_Oordeel",
-	"Buitenbalans_Verplichtingen",
-	"Red_Flags",
-]
+# Citaatcontrole (citaten.py): een citaat telt als gevonden vanaf deze rapidfuzz-score (0-100)
+CITAAT_MIN_SCORE = 90
+CITAAT_MIN_LENGTE = 12          # Kortere citaten zijn te algemeen om iets te bewijzen
+CITAAT_MIN_TEKST_TEKENS = 200   # Minder tekst in de hele PDF: gescand, dus niet controleerbaar
+
+# De sleutels van het tekstantwoord staan in tekst_schema.TekstAntwoord (afgedwongen schema)
 
 # Tweede pass: na de berekening licht Gemini de resultaten toe. Het oordeel staat al vast.
 OORDEEL_PROMPT = """
 You are an experienced Belgian M&A and Private Equity analyst. The LBO model has been
 run and you receive the results plus the findings from the annual report. Always
-answer in English.
+answer in English. The answer follows a fixed JSON schema.
 
-Return only a valid JSON object with exactly this key:
-{
-  "Kwalitatief_LBO_Oordeel": "Concise commentary on the LBO result"
-}
+Fields:
+- kwalitatief_lbo_oordeel: concise commentary on the LBO result.
+- investment_thesis: exactly three bullets, each one sentence: why a PE fund would or
+  would not want to own this company. Ground each bullet in the figures or findings.
+- dd_vragen: exactly five due diligence questions. Each question tests one red flag or
+  one assumption from the input; gekoppeld_aan names that red flag or assumption.
 
 Instructions:
 - LBO_Status is the conclusion of the model. Explain it: do not contradict it and do
   not replace it with a conclusion of your own.
 - Explain the result from the data: cash flow stability, multi-year trend, covenants,
-  leverage, use of the RCF and returns.
+  leverage, use of the RCF and returns. The screening case (rule-based, with a standard
+  stress) and the AI case may differ: name the gap when it matters.
 - A qualitative concern the model does not measure is named as a point of attention.
 - Use only the figures provided. Do not calculate or estimate new ones. The value null
   means the figure is not available.
 - Do not invent anything.
 """
 
-OORDEEL_SLEUTELS = ["Kwalitatief_LBO_Oordeel"]
+# De sleutels van het oordeelantwoord staan in tekst_schema.OordeelAntwoord (afgedwongen schema)
 
 OORDEEL_VELDEN = [
 	"LBO_Status",
@@ -313,6 +323,11 @@ OORDEEL_VELDEN = [
 	"Buitenbalans_Verplichtingen",
 	"Normalisatie_Voorstellen",
 	"Red_Flags",
+	"Eigendom",
+	"LBO_Screening_IRR_Pct",
+	"LBO_Stress_IRR_Pct",
+	"LBO_Stress_Convenanten",
+	"LBO_Assumptie_Vlaggen",
 ]
 
 

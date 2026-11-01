@@ -23,7 +23,9 @@ OPTIONELE_TEKSTKOLOMMEN = (
     "Buitenbalans_Verplichtingen",
     "Kwalitatief_LBO_Oordeel",
     "Gebruikt_Model",
+    "AI_Business_Model",
 )
+OPTIONELE_AI_LIJSTEN = ("AI_Normalisaties", "AI_Red_Flags", "AI_Buitenbalans", "AI_Investment_Thesis", "AI_DD_Vragen")
 
 
 def _pct(teller, noemer):
@@ -224,7 +226,12 @@ def bouw_dataframe(resultaten):
     df["LBO_Assumptie_Vlaggen"] = pd.Series(
         [
             assumpties.controleer(
-                r["LBO_Assumpties"], r["LBO_Driver_Pack"]["Fiscal_Years"], r["Omzet_of_Brutomarge"], r["Personeelskosten"]
+                r["LBO_Assumpties"],
+                r["LBO_Driver_Pack"]["Fiscal_Years"],
+                r["Omzet_of_Brutomarge"],
+                r["Personeelskosten"],
+                ebitda_0=r["Genormaliseerde_EBITDA"],
+                hist_ebitda_cagr=r["Driver_EBITDA_CAGR_Pct"],
             )
             if r["LBO_Driver_Pack"] is not None
             else []
@@ -527,13 +534,29 @@ def bouw_dataframe(resultaten):
         "Commissaris_Oordeel",
         "Buitenbalans_Verplichtingen",
         "Red_Flags",
+        "Eigendom",
         "Kwalitatief_LBO_Oordeel",
+        "AI_Business_Model",
+        "AI_Normalisaties",
+        "AI_Red_Flags",
+        "AI_Eigendom",
+        "AI_Buitenbalans",
+        "AI_Investment_Thesis",
+        "AI_DD_Vragen",
         "Bronbestand",
         "Gebruikt_Model",
     ]
     for kol in OPTIONELE_TEKSTKOLOMMEN:
         if kol not in df:
             df[kol] = ""
+    # Structured AI output (text pass and second pass): lists, empty without Gemini
+    for kol in OPTIONELE_AI_LIJSTEN:
+        if kol not in df:
+            df[kol] = pd.Series([[] for _ in range(len(df))], index=df.index, dtype=object)
+    if "AI_Eigendom" not in df:
+        df["AI_Eigendom"] = pd.Series([None] * len(df), index=df.index, dtype=object)
+    if "Eigendom" not in df:
+        df["Eigendom"] = labels.OWNERSHIP_TYPES["onbekend"]
     ontbrekend = [kol for kol in volgorde if kol not in df]
     if ontbrekend:
         raise ValueError(f"Kolommen ontbreken in het resultaat: {', '.join(ontbrekend)}")

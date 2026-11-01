@@ -214,6 +214,44 @@ ASSUMPTIONS_SCREENING = "Rule-based (filing)"
 ASSUMPTIONS_STRESS = "Rule-based (filing) with the standard stress: EBITDA {haircuts} below the Screening Base in Y1-Y5"
 ASSUMPTIONS_RULE_BASED = "Filing (rule-based)"
 
+NONE = "None"
+OWNERSHIP_TYPES = {
+	"zelfstandig": "Independent",
+	"groepsdochter": "Group subsidiary",
+	"pe_backed": "PE-backed",
+	"onbekend": "Ownership unknown",
+}
+OWNERSHIP_CONSOLIDATED = "consolidated"
+YES_NO_UNKNOWN = {"ja": "yes", "nee": "no", "onbekend": "unknown"}
+ADJUSTMENT_TYPES = {
+	"bestuurdersvergoeding": "Director remuneration",
+	"huur_verbonden_partij": "Related-party rent",
+	"privekosten": "Private expenses",
+	"eenmalig": "Non-recurring item",
+	"subsidie": "Subsidy",
+	"overig": "Other",
+}
+FLAG_CATEGORIES = {
+	"governance": "Governance",
+	"verbonden_partijen": "Related parties",
+	"going_concern": "Going concern",
+	"juridisch": "Legal",
+	"klantconcentratie": "Customer concentration",
+	"personeel": "Personnel",
+	"overig": "Other",
+}
+SEVERITIES = {"hoog": "HIGH", "middel": "MEDIUM", "laag": "LOW"}
+ASSUMPTION_FLAG_DOWNSIDE_DEPTH = (
+	"Downside EBITDA in Y5 (EUR {down:,.0f}) is below {pct:.0f}% of Base (EUR {base:,.0f}): not a credible setback"
+)
+ASSUMPTION_FLAG_EBITDA_CAGR = (
+	"Base EBITDA CAGR {ai:+.1f}% against a historical {hist:+.1f}%: more than {pp:.0f} pp above the trend"
+)
+DD_LINKED_TO = "tests"
+QUOTE_NOT_FOUND = "Quoted source not found in the PDF: confidence set to low"
+AMOUNT_FROM_CSV = "CSV code {code}"
+AMOUNT_AI_UNVERIFIED = "AI, to be verified"
+
 SNAPSHOT_LABEL = "Assumption Snapshot"
 SNAPSHOT_DATE = "Snapshot Date"
 SNAPSHOT_STATUS = "Snapshot Status"
@@ -680,6 +718,10 @@ COLUMN_LABELS = {
 	"LBO_Snapshot_Datum": "Snapshot Date",
 	"LBO_Snapshot_Status": "Snapshot Status",
 	"Run_Manifest": "Run Manifest",
+	"Eigendom": "Ownership",
+	"AI_Business_Model": "Business Model (AI)",
+	"AI_Investment_Thesis": "Investment Thesis (AI)",
+	"AI_DD_Vragen": "Due Diligence Questions (AI)",
 	"Eigen_Vermogen": "Shareholders' Equity",
 	"Balanstotaal": "Total Assets",
 	"Overgedragen_Resultaat": "Retained Earnings",

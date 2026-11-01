@@ -666,6 +666,32 @@ def bouw_driver_pack(neerleggingen):
 		"Company": neerleggingen[-1].naam,
 		"Omzet_Basis": labels.BASIS_REVENUE if omzet_code == "70" else labels.BASIS_GROSS_MARGIN,
 		"Fiscal_Years": jaren,
+		"Economics": bouw_economics(reeks[-1], omzet_code),
+	}
+
+
+def bouw_economics(jaar, omzet_code):
+	"""How the last fiscal year earns its EBITDA, so Gemini can judge what a scenario does to it.
+
+	EBITDA_Sensitivity_Per_1pp_Cost_Pct: one percentage point of revenue more in purchases or other
+	costs takes this share of EBITDA. With a thin margin a small cost shift wipes out the EBITDA.
+	"""
+	regels = _modelregels(jaar, None, omzet_code)
+	omzet, ebitda = regels["Omzet"], regels["EBITDA"]
+
+	def pct(teller, noemer):
+		if math.isnan(teller) or math.isnan(noemer) or noemer <= 0:
+			return None
+		return round(teller / noemer * 100, 2)
+
+	return {
+		"Fiscal_Year": jaar.boekjaar,
+		"Revenue": None if math.isnan(omzet) else round(omzet),
+		"Adjusted_EBITDA": None if math.isnan(ebitda) else round(ebitda),
+		"Gross_Margin_Pct": pct(_brutomarge(jaar), omzet),
+		"EBITDA_Margin_Pct": pct(ebitda, omzet),
+		"COGS_Pct_Revenue": pct(regels["Inkoop"], omzet),
+		"EBITDA_Sensitivity_Per_1pp_Cost_Pct": pct(omzet * 0.01, ebitda),
 	}
 
 

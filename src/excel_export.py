@@ -48,6 +48,7 @@ OVERZICHT_KOLOMMEN = [
 	("Schema_Type", labels.GROUP_IDENTIFICATION, 12),
 	("LBO_Status", labels.GROUP_IDENTIFICATION, 36),
 	("Data_Volledigheid", labels.GROUP_IDENTIFICATION, 34),
+	("Eigendom", labels.GROUP_IDENTIFICATION, 34),
 	("Omzet_of_Brutomarge", labels.GROUP_TRENDS, 15),
 	("Omzetgroei_Pct", labels.GROUP_TRENDS, 11),
 	("Genormaliseerde_EBITDA", labels.GROUP_TRENDS, 13),
@@ -90,7 +91,9 @@ TEKST_KOLOMMEN = {
 	"LBO_Screening_Convenanten",
 	"LBO_Stress_Convenanten",
 	"Red_Flags",
+	"Eigendom",
 	"Kwalitatief_LBO_Oordeel",
+	"AI_Business_Model",
 }
 STATUS_KOLOMMEN = {"LBO_Status", "LBO_Schuld_Onder_2x_5J"}
 PCT_KOLOMMEN = {
@@ -137,7 +140,10 @@ MULT_KOLOMMEN = {
 	"Indicatieve_MoIC",
 }
 GEEN_BEDRAG_KOLOMMEN = {"Boekjaar", "Boekjaar_Begin", "Boekjaar_Einde", "LBO_Closing_Datum", "Ondernemingsnummer"}
-OBJECT_KOLOMMEN = ["LBO_Jaren", "LBO_Integriteit", "LBO_Scenarios", "LBO_Assumpties", "LBO_Assumptie_Vlaggen", "LBO_Driver_Pack"]
+OBJECT_KOLOMMEN = [
+	"LBO_Jaren", "LBO_Integriteit", "LBO_Scenarios", "LBO_Assumpties", "LBO_Assumptie_Vlaggen", "LBO_Driver_Pack",
+	"AI_Normalisaties", "AI_Red_Flags", "AI_Eigendom", "AI_Buitenbalans", "AI_Investment_Thesis", "AI_DD_Vragen",
+]
 
 
 def _schrijf_overzichtcel(ws, rij_nr, kolom_nr, kol_naam, rij, numeriek):

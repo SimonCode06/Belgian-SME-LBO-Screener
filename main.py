@@ -17,10 +17,11 @@ import re
 import sys
 import time
 
+import pandas as pd
 from google import genai
 from google.genai import types
 
-from src import assumpties, config, labels
+from src import assumpties, citaten, config, labels
 from src.ai_extraction import (
 	analyseer_tekst,
 	bouw_assumptie_prompt,
@@ -33,6 +34,7 @@ from src.assumpties import AssumptieAntwoord, pack_uit_antwoord
 from src.calculations import bouw_dataframe
 from src.excel_export import schrijf_overzicht, schrijf_per_bedrijf
 from src.manifest import bouw_manifest, manifest_naam, schrijf_manifest
+from src.tekst_schema import OordeelAntwoord, TekstAntwoord, verwerk_tekst
 from src.nbb_csv import bouw_cijfers, bouw_driver_pack, bouw_meerjaren, groepeer_per_bedrijf, lees_neerlegging
 
 
@@ -71,6 +73,11 @@ def geen_tekst(reden):
 		"Commissaris_Oordeel": labels.OPINION_UNKNOWN,
 		"Buitenbalans_Verplichtingen": reden,
 		"Red_Flags": "",
+		"Eigendom": labels.OWNERSHIP_TYPES["onbekend"],
+		"AI_Normalisaties": [],
+		"AI_Red_Flags": [],
+		"AI_Eigendom": None,
+		"AI_Buitenbalans": [],
 		"Kwalitatief_LBO_Oordeel": reden,
 		"Gebruikt_Model": "-",
 	}
@@ -119,6 +126,7 @@ def _uit_snapshot(pad, driver_pack, mislukt):
 		mislukt.append(f"snapshot {pad.name}")
 		return None, labels.ASSUMPTIONS_FALLBACK_NO_AI, driver_pack, None, None
 	info = assumpties.snapshot_info(pad, metadata)
+	info["business_model"] = antwoord.business_model
 	print(f"   -> Assumpties uit snapshot: {pad.name} (status: {info['status']})")
 	return pack_uit_antwoord(antwoord), labels.ASSUMPTIONS_AI, driver_pack, metadata.get("gemini_model"), info
 
@@ -176,31 +184,35 @@ def haal_assumpties(client, pdf, bedrijf, cijfers, mislukt, vernieuw=False):
 	return _uit_snapshot(snapshot, driver_pack, mislukt)
 
 
-def lees_cache(pad, sleutels=config.VERWACHTE_SLEUTELS):
-	"""Een ontbrekend, kapot of onvolledig cachebestand telt als geen cache."""
+def lees_cache(pad, schema=TekstAntwoord):
+	"""Een ontbrekend, kapot of ongeldig cachebestand (ook een oud formaat) telt als geen cache."""
 	try:
-		tekst = json.loads(pad.read_text(encoding="utf-8"))
-	except (OSError, json.JSONDecodeError):
+		data = json.loads(pad.read_text(encoding="utf-8"))
+		schema.model_validate({k: v for k, v in data.items() if k != "Gebruikt_Model"})
+	except (OSError, ValueError, AttributeError):
 		return None
-	if not isinstance(tekst, dict) or any(sleutel not in tekst for sleutel in sleutels):
-		return None
-	return tekst
+	return data
 
 
-def koppel_tekst(cijfers, tekst):
-	"""Controleert of de PDF bij dezelfde neerlegging hoort als de cijfers."""
-	if "Ondernemingsnummer" not in tekst:  # geen Gemini-antwoord, dus niets te controleren
+def koppel_tekst(cijfers, tekst, codes=None, paginas=None):
+	"""Controleert of de PDF bij dezelfde neerlegging hoort als de cijfers en verwerkt het antwoord.
+
+	codes: de NBB-codes van de recentste neerlegging, zodat een bedrag met een NBB-code uit de CSV komt.
+	paginas: de PDF-tekst per pagina voor de citaatcontrole (None: niet controleerbaar).
+	"""
+	if "ondernemingsnummer" not in tekst:  # geen Gemini-antwoord, dus niets te controleren
 		return tekst
 
 	cijfer_nummer = re.sub(r"\D", "", cijfers["Ondernemingsnummer"])
-	pdf_nummer = re.sub(r"\D", "", str(tekst.get("Ondernemingsnummer", "")))
+	pdf_nummer = re.sub(r"\D", "", str(tekst.get("ondernemingsnummer", "")))
 	if pdf_nummer != cijfer_nummer:
 		return geen_tekst(
 			labels.TEXT_WRONG_COMPANY.format(pdf=pdf_nummer or labels.TEXT_UNKNOWN, figures=cijfer_nummer)
 		)
 
-	velden = {k: v for k, v in tekst.items() if k not in ("Ondernemingsnummer", "Boekjaar")}
-	pdf_jaar = str(tekst.get("Boekjaar", ""))
+	velden = verwerk_tekst(tekst, codes or {}, paginas)
+	velden.pop("Ondernemingsnummer")
+	pdf_jaar = str(velden.pop("Boekjaar", ""))
 	if pdf_jaar != cijfers["Boekjaar"]:
 		signaal = labels.TEXT_WRONG_YEAR.format(pdf=pdf_jaar or labels.TEXT_UNKNOWN, figures=cijfers["Boekjaar"])
 		velden["Red_Flags"] = f"{signaal}; {velden.get('Red_Flags', '')}".strip("; ")
@@ -208,8 +220,12 @@ def koppel_tekst(cijfers, tekst):
 
 
 def voeg_oordelen_toe(df, client, mislukt):
-	"""Tweede pass: Gemini licht per bedrijf de uitkomst van het model toe."""
+	"""Tweede pass: Gemini licht per bedrijf de uitkomst van het model toe, met these en DD-vragen."""
+	toelichtingen, theses, vragen = [], [], []
 	for index, rij in df.iterrows():
+		toelichtingen.append(rij["Kwalitatief_LBO_Oordeel"])
+		theses.append([])
+		vragen.append([])
 		print(f"[{index + 1}/{len(df)}] Toelichting op de resultaten: {rij['Bedrijfsnaam']}")
 		# Wie al een reden heeft (geen PDF, verkeerde PDF, mislukte eerste pass), heeft geen tekst om toe te lichten
 		if isinstance(rij["Kwalitatief_LBO_Oordeel"], str) and rij["Kwalitatief_LBO_Oordeel"]:
@@ -217,11 +233,11 @@ def voeg_oordelen_toe(df, client, mislukt):
 			continue
 
 		cache_pad = oordeel_cache_pad_voor(rij)
-		oordeel = lees_cache(cache_pad, config.OORDEEL_SLEUTELS)
+		oordeel = lees_cache(cache_pad, OordeelAntwoord)
 		if oordeel is not None:
 			print("   -> Toelichting uit cache")
 		elif client is None:
-			oordeel = {"Kwalitatief_LBO_Oordeel": labels.COMMENTARY_NO_GEMINI}
+			oordeel = {"kwalitatief_lbo_oordeel": labels.COMMENTARY_NO_GEMINI}
 		else:
 			try:
 				oordeel = schrijf_oordeel(client, rij)
@@ -229,7 +245,7 @@ def voeg_oordelen_toe(df, client, mislukt):
 				print(f"   -> Toelichting geschreven ({oordeel['Gebruikt_Model']})")
 			except Exception as fout:
 				print(f"   -> FOUT bij de toelichting van {rij['Bedrijfsnaam']}: {fout}")
-				oordeel = {"Kwalitatief_LBO_Oordeel": labels.COMMENTARY_FAILED}
+				oordeel = {"kwalitatief_lbo_oordeel": labels.COMMENTARY_FAILED}
 				mislukt.append(f"toelichting {rij['Bedrijfsnaam']}")
 				if labels.API_KEY_REFUSED in str(fout):
 					client = None
@@ -237,7 +253,13 @@ def voeg_oordelen_toe(df, client, mislukt):
 			if client is not None and index + 1 < len(df):
 				time.sleep(config.PAUZE_TUSSEN_PDFS_SEC)
 
-		df.at[index, "Kwalitatief_LBO_Oordeel"] = oordeel["Kwalitatief_LBO_Oordeel"]
+		toelichtingen[-1] = oordeel["kwalitatief_lbo_oordeel"]
+		theses[-1] = list(oordeel.get("investment_thesis", []))
+		vragen[-1] = list(oordeel.get("dd_vragen", []))
+
+	df["Kwalitatief_LBO_Oordeel"] = toelichtingen
+	df["AI_Investment_Thesis"] = pd.Series(theses, index=df.index, dtype=object)
+	df["AI_DD_Vragen"] = pd.Series(vragen, index=df.index, dtype=object)
 
 
 def lees_argumenten(argv=None):
@@ -286,6 +308,7 @@ def main(argv=None):
 		cijfers = bouw_cijfers(bedrijf)
 		meerjaren[cijfers["Ondernemingsnummer"]] = bouw_meerjaren(bedrijf)
 		pdf = zoek_pdf(bedrijf, pdf_per_naam)
+		paginas = citaten.pdf_paginas(pdf)  # PDF-tekst per pagina, voor de citaatcontrole
 
 		if pdf is None:
 			tekst = geen_tekst(labels.TEXT_NO_PDF)
@@ -321,7 +344,9 @@ def main(argv=None):
 			"pdf": pdf,
 			"gemini_model": assumptie_model,
 		}
-		velden = koppel_tekst(cijfers, tekst)
+		velden = koppel_tekst(cijfers, tekst, bedrijf[-1].codes, paginas)
+		if pack is not None:
+			citaten.controleer_assumpties(pack, paginas, assumpties.SCENARIOS)
 		if assumptie_model:
 			velden["Gebruikt_Model"] = assumptie_model
 		resultaten.append(
@@ -334,6 +359,7 @@ def main(argv=None):
 				"LBO_Snapshot_Naam": snapshot["naam"] if snapshot else "-",
 				"LBO_Snapshot_Datum": snapshot["datum"] if snapshot else "-",
 				"LBO_Snapshot_Status": snapshot["status"] if snapshot else "-",
+				"AI_Business_Model": snapshot["business_model"] if snapshot else "",
 			}
 		)
 
