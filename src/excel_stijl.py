@@ -18,10 +18,10 @@ VULLING_ACTUAL = "F2F2F2"
 VULLING_OK = "C6EFCE"
 VULLING_FOUT = "FFC7CE"
 
-FMT_BEDRAG = '#,##0,_);(#,##0,);"-"_)'
+FMT_BEDRAG = '#,##0,_);(#,##0,);"–"_)'  # EUR thousands, negatives in brackets, zero as a dash
 FMT_PCT = "0.0%"
 FMT_MULT = '0.0"x"'
-FMT_MULT_2 = '0.00"x"'
+FMT_RATIO = '[>10]">10.0x";0.0"x"'  # coverage ratios: anything above 10x reads as comfortable
 FMT_DAGEN = '0.0 "d"'
 FMT_PP = '0.0 "pp"'
 FMT_GETAL = "0.0"
@@ -54,6 +54,25 @@ def sectiekop(cel, tekst=None):
 	cel.font = lettertype(WIT, vet=True)
 	cel.fill = VUL_SECTIE
 	cel.alignment = Alignment(vertical="center")
+
+
+def afdruk(ws, bedrijf, titelrijen="1:4", titelkolommen="A:B"):
+	"""A4 landscape, one page wide, titles repeated, and a confidential footer with page numbers."""
+	ws.page_setup.orientation = "landscape"
+	ws.page_setup.paperSize = ws.PAPERSIZE_A4
+	ws.sheet_properties.pageSetUpPr.fitToPage = True
+	ws.page_setup.fitToWidth = 1
+	ws.page_setup.fitToHeight = 0
+	ws.page_margins.left = ws.page_margins.right = 0.4
+	ws.page_margins.top = ws.page_margins.bottom = 0.5
+	if titelrijen:
+		ws.print_title_rows = titelrijen
+	if titelkolommen:
+		ws.print_title_cols = titelkolommen
+	ws.oddFooter.left.text = f"{bedrijf} | {labels.FOOTER_CONFIDENTIAL}"
+	ws.oddFooter.left.size = 8
+	ws.oddFooter.right.text = "&A | &P / &N"
+	ws.oddFooter.right.size = 8
 
 
 def status_kleur(cel, tekst):

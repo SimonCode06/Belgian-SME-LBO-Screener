@@ -117,6 +117,8 @@ class Rij:
 	closing: Optional[Callable] = None
 	jaar: Optional[Callable] = None
 	label: Optional[str] = None
+	hulp: bool = False  # helper row: grouped and collapsed by default
+	rente: Optional[str] = None  # the named rate shown in the unit column (interest rows)
 
 
 @dataclass
@@ -416,7 +418,7 @@ def _vintage_rij(vintage):
 		eerste = f"${get_column_letter(c.kol.jaren[vintage - 1])}{c.r['model'][sleutel]}"
 		return f"=MIN({bron}-SUM({eerste}:{c.p(sleutel)}),{grens})"
 
-	return Rij(f"vintage_{vintage}", jaar=formule, label=labels.ROW_LABELS["vintage"].format(year=vintage))
+	return Rij(f"vintage_{vintage}", jaar=formule, label=labels.ROW_LABELS["vintage"].format(year=vintage), hulp=True)
 
 
 def _rijen_lbo():
@@ -445,20 +447,25 @@ def _rijen_lbo():
 			jaar=lambda c: f"=MAX(0,{c.h('d_rcf_open')}+{c.h('d_draw')}-{c.h('d_repay')})",
 		),
 		Rij("d_rcf_room", jaar=lambda c: f"=RCF_Limit-{c.h('d_rcf')}"),
+		Rij("d_vendor_open", jaar=lambda c: f"={c.p('d_vendor')}"),
+		# PIK: the interest is added to the balance and repaid with the principal at exit
+		Rij("d_pik", jaar=lambda c: f"={c.h('i_vendor')}" if config.LBO_VENDOR_LOAN_PIK else "=0"),
 		Rij(
 			"d_vendor",
 			stijl="subtotaal",
 			closing=lambda c: "=Vendor_Amount",
-			# PIK: the interest is added to the balance and repaid with the principal at exit
-			jaar=lambda c: f"={c.p('d_vendor')}+{c.h('i_vendor')}" if config.LBO_VENDOR_LOAN_PIK else f"={c.p('d_vendor')}",
+			jaar=lambda c: f"={c.h('d_vendor_open')}+{c.h('d_pik')}",
 		),
 		Sectie(labels.SECTION_INTEREST),
-		Rij("i_senior", jaar=lambda c: f"={c.h('d_senior_open')}*Senior_Rate*{c.x('fractie')}"),
-		Rij("i_rcf", jaar=lambda c: f"={c.h('d_rcf_open')}*RCF_Rate*{c.x('fractie')}"),
-		Rij("i_commit", jaar=lambda c: f"=(RCF_Limit-{c.h('d_rcf_open')})*RCF_Commitment_Fee*{c.x('fractie')}"),
-		Rij("i_vendor", jaar=lambda c: f"={c.p('d_vendor')}*Vendor_Rate*{c.x('fractie')}"),
+		Rij("i_senior", rente="Senior_Rate", jaar=lambda c: f"={c.h('d_senior_open')}*Senior_Rate*{c.x('fractie')}"),
+		Rij("i_rcf", rente="RCF_Rate", jaar=lambda c: f"={c.h('d_rcf_open')}*RCF_Rate*{c.x('fractie')}"),
+		Rij(
+			"i_commit", rente="RCF_Commitment_Fee",
+			jaar=lambda c: f"=(RCF_Limit-{c.h('d_rcf_open')})*RCF_Commitment_Fee*{c.x('fractie')}",
+		),
+		Rij("i_vendor", rente="Vendor_Rate", jaar=lambda c: f"={c.h('d_vendor_open')}*Vendor_Rate*{c.x('fractie')}"),
 		Rij("i_total", stijl="subtotaal", jaar=_kolom_som("i_senior", "i_vendor")),
-		Rij("i_income", jaar=lambda c: f"=MAX({c.h('w_open')},0)*Cash_Rate*{c.x('fractie')}"),
+		Rij("i_income", rente="Cash_Rate", jaar=lambda c: f"=MAX({c.h('w_open')},0)*Cash_Rate*{c.x('fractie')}"),
 		Sectie(labels.SECTION_WATERFALL),
 		Rij("w_ebitda", jaar=lambda c: f"={c.x('ebitda')}"),
 		Rij("w_tax", jaar=lambda c: f"={c.x('tax')}"),
@@ -477,7 +484,7 @@ def _rijen_lbo():
 		Rij("w_mand", jaar=lambda c: f"=-{c.h('d_mand')}"),
 		Rij("w_ecf", stijl="subtotaal", jaar=lambda c: f"={c.h('w_fcf')}+{c.h('w_mand')}"),
 		Rij("w_open", jaar=lambda c: f"={c.xp('cash')}"),
-		Rij("w_pos", jaar=lambda c: f"={c.h('w_open')}+{c.h('w_ecf')}-Min_Cash"),
+		Rij("w_pos", hulp=True, jaar=lambda c: f"={c.h('w_open')}+{c.h('w_ecf')}-Min_Cash"),
 		Rij("w_draw", jaar=lambda c: f"=MIN(MAX(0,-{c.h('w_pos')}),RCF_Limit-{c.h('d_rcf_open')})"),
 		Rij("w_repay", jaar=lambda c: f"=MIN(MAX(0,{c.h('w_pos')}),{c.h('d_rcf_open')})"),
 		Rij(
@@ -491,7 +498,7 @@ def _rijen_lbo():
 			"w_vrij",
 			jaar=lambda c: f"=MIN({c.h('w_ecf')},{c.h('w_pos')})-{c.h('w_repay')}-{c.h('w_sweep')}",
 		),
-		Rij("w_res", jaar=lambda c: f"=MAX(0,{c.p('res_close')}+{c.x('ni')})"),
+		Rij("w_res", hulp=True, jaar=lambda c: f"=MAX(0,{c.p('res_close')}+{c.x('ni')})"),
 		Rij(
 			"w_div",
 			jaar=lambda c: (
@@ -507,17 +514,18 @@ def _rijen_lbo():
 		),
 		Rij(
 			"res_close",
+			hulp=True,
 			closing=lambda c: 0,
 			jaar=lambda c: f"={c.p('res_close')}+{c.x('ni')}-{c.h('w_div')}",
 		),
 		Sectie(labels.SECTION_COVENANTS),
 		Rij("c_cfads", jaar=lambda c: _cfads_formule(c)),
-		Rij("c_icr", fmt=stijl.FMT_MULT_2, jaar=lambda c: _icr_formule(c)),
-		Rij("c_icr_min", fmt=stijl.FMT_MULT_2, jaar=lambda c: "=Min_ICR"),
-		Rij("c_icr_room", fmt=stijl.FMT_MULT_2, jaar=lambda c: f'=IF({c.h("c_icr")}="","",{c.h("c_icr")}-{c.h("c_icr_min")})'),
-		Rij("c_dscr", fmt=stijl.FMT_MULT_2, jaar=lambda c: _dscr_formule(c)),
-		Rij("c_dscr_min", fmt=stijl.FMT_MULT_2, jaar=lambda c: "=Min_DSCR"),
-		Rij("c_dscr_room", fmt=stijl.FMT_MULT_2, jaar=lambda c: f'=IF({c.h("c_dscr")}="","",{c.h("c_dscr")}-{c.h("c_dscr_min")})'),
+		Rij("c_icr", fmt=stijl.FMT_RATIO, jaar=lambda c: _icr_formule(c)),
+		Rij("c_icr_min", fmt=stijl.FMT_MULT, hulp=True, jaar=lambda c: "=Min_ICR"),
+		Rij("c_icr_room", fmt=stijl.FMT_RATIO, jaar=lambda c: f'=IF({c.h("c_icr")}="","",{c.h("c_icr")}-{c.h("c_icr_min")})'),
+		Rij("c_dscr", fmt=stijl.FMT_RATIO, jaar=lambda c: _dscr_formule(c)),
+		Rij("c_dscr_min", fmt=stijl.FMT_MULT, hulp=True, jaar=lambda c: "=Min_DSCR"),
+		Rij("c_dscr_room", fmt=stijl.FMT_RATIO, jaar=lambda c: f'=IF({c.h("c_dscr")}="","",{c.h("c_dscr")}-{c.h("c_dscr_min")})'),
 		Rij(
 			"nd_bank",
 			closing=lambda c: _net_debt_formule(c, "Bank"),
@@ -528,16 +536,16 @@ def _rijen_lbo():
 			closing=lambda c: _net_debt_formule(c, "Val"),
 			jaar=lambda c: _net_debt_formule(c, "Val"),
 		),
-		Rij("c_lev", fmt=stijl.FMT_MULT_2, jaar=lambda c: _leverage_formule(c)),
+		Rij("c_lev", fmt=stijl.FMT_MULT, jaar=lambda c: _leverage_formule(c)),
 		Rij(
 			"c_lev_total",
-			fmt=stijl.FMT_MULT_2,
+			fmt=stijl.FMT_MULT,
 			jaar=lambda c: (
 				f'=IF({c.h("w_ebitda")}/{c.x("fractie")}>0,{c.h("nd_bank")}/({c.h("w_ebitda")}/{c.x("fractie")}),"")'
 			),
 		),
-		Rij("c_lev_max", fmt=stijl.FMT_MULT_2, jaar=lambda c: "=Max_Leverage"),
-		Rij("c_lev_room", fmt=stijl.FMT_MULT_2, jaar=lambda c: f'=IF({c.h("c_lev")}="","",{c.h("c_lev_max")}-{c.h("c_lev")})'),
+		Rij("c_lev_max", fmt=stijl.FMT_MULT, hulp=True, jaar=lambda c: "=Max_Leverage"),
+		Rij("c_lev_room", fmt=stijl.FMT_MULT, jaar=lambda c: f'=IF({c.h("c_lev")}="","",{c.h("c_lev_max")}-{c.h("c_lev")})'),
 		Rij(
 			"c_status",
 			fmt="@",
@@ -629,10 +637,10 @@ def _invoer(rij):
 		("tax", "Interest_Cap_Pct", config.LBO_RENTEAFTREK_EBITDA_PCT, stijl.FMT_PCT),
 		("tax", "Goodwill_Life", config.LBO_GOODWILL_LOOPTIJD_JAAR, stijl.FMT_GETAL),
 		("tax", "Capex_Life", config.LBO_CAPEX_LEVENSDUUR_JAAR, stijl.FMT_GETAL),
-		("covenants", "Min_DSCR", config.LBO_COVENANT_MIN_DSCR, stijl.FMT_MULT_2),
-		("covenants", "Min_ICR", config.LBO_COVENANT_MIN_RENTEDEKKING, stijl.FMT_MULT_2),
-		("covenants", "Max_Leverage", config.LBO_COVENANT_MAX_LEVERAGE, stijl.FMT_MULT_2),
-		("covenants", "Target_Leverage", config.LBO_TARGET_END_LEVERAGE, stijl.FMT_MULT_2),
+		("covenants", "Min_DSCR", config.LBO_COVENANT_MIN_DSCR, stijl.FMT_MULT),
+		("covenants", "Min_ICR", config.LBO_COVENANT_MIN_RENTEDEKKING, stijl.FMT_MULT),
+		("covenants", "Max_Leverage", config.LBO_COVENANT_MAX_LEVERAGE, stijl.FMT_MULT),
+		("covenants", "Target_Leverage", config.LBO_TARGET_END_LEVERAGE, stijl.FMT_MULT),
 		("working", "Min_Cash_Months", config.MIN_CASH_MAANDEN_OPEX, stijl.FMT_GETAL),
 		("working", "Min_Cash_Pct_Purchases", config.MIN_CASH_PCT_INKOOP, stijl.FMT_PCT),
 		("working", "Goods_Basis", rij["Driver_Kosten_60_Pct"] / 100, stijl.FMT_PCT),
@@ -1032,6 +1040,13 @@ class Bouwer:
 					self._zet(ws, nr, kolom, spec.jaar(self._ctx(blad, kolom, jaar)), spec.fmt)
 			self._grijs(ws, nr)
 			self._rij_stijl(ws, nr, spec.stijl)
+			if spec.rente:
+				self._zet(ws, nr, 2, f"={spec.rente}", "0.00%" if spec.rente == "RCF_Commitment_Fee" else stijl.FMT_PCT)
+			if spec.hulp:
+				ws.row_dimensions[nr].collapsed = False
+				ws.row_dimensions[nr].outlineLevel = 1
+				ws.row_dimensions[nr].hidden = True
+				ws.row_dimensions[nr + 1].collapsed = True
 
 	# ------------------------------------------------------------------ assumption block
 	def _driver_fmt(self, driver):
@@ -1323,7 +1338,7 @@ class Bouwer:
 			("x_ev", f"=MAX(C{rl['x_ebitda']},0)*C{rl['x_mult']}", stijl.FMT_BEDRAG),
 			("x_nd", f"={k5}{rl['nd_val']}", stijl.FMT_BEDRAG),
 			("x_equity", f"=C{rl['x_ev']}-C{rl['x_nd']}", stijl.FMT_BEDRAG),
-			("x_lev", f'=IF(C{rl["x_ebitda"]}>0,C{rl["x_nd"]}/C{rl["x_ebitda"]},"")', stijl.FMT_MULT_2),
+			("x_lev", f'=IF(C{rl["x_ebitda"]}>0,C{rl["x_nd"]}/C{rl["x_ebitda"]},"")', stijl.FMT_MULT),
 			(
 				"x_duration",
 				f"=SUM({ZIJDE_MODEL}{get_column_letter(self.kol.jaren[0])}{self.r['model']['fractie']}:{k5}{self.r['model']['fractie']})",
@@ -1354,7 +1369,7 @@ class Bouwer:
 		self._label(ws, rl["x_moic"], labels.ROW_LABELS["x_moic"], vet=True)
 		self._zet(ws, rl["x_irr"], 3, f"=IF({ok},{rendement},-1)", stijl.FMT_PCT, vet=True)
 		self._zet(
-			ws, rl["x_moic"], 3, f"=IF({ok},(C{rl['x_equity']}+{dividenden})/Sponsor_Equity,0)", stijl.FMT_MULT_2, vet=True
+			ws, rl["x_moic"], 3, f"=IF({ok},(C{rl['x_equity']}+{dividenden})/Sponsor_Equity,0)", stijl.FMT_MULT, vet=True
 		)
 		self._rij_stijl(ws, rl["x_moic"], "eindtotaal", 3)
 
@@ -1366,9 +1381,9 @@ class Bouwer:
 			"@",
 		)
 		self._label(ws, rl["x_peak_lev"], labels.ROW_LABELS["x_peak_lev"])
-		self._zet(ws, rl["x_peak_lev"], 3, f"=MAX({jaren_k}{rl['c_lev']}:{k5}{rl['c_lev']})", stijl.FMT_MULT_2)
+		self._zet(ws, rl["x_peak_lev"], 3, f"=MAX({jaren_k}{rl['c_lev']}:{k5}{rl['c_lev']})", stijl.FMT_MULT)
 		self._label(ws, rl["x_min_dscr"], labels.ROW_LABELS["x_min_dscr"])
-		self._zet(ws, rl["x_min_dscr"], 3, f"=MIN({jaren_k}{rl['c_dscr']}:{k5}{rl['c_dscr']})", stijl.FMT_MULT_2)
+		self._zet(ws, rl["x_min_dscr"], 3, f"=MIN({jaren_k}{rl['c_dscr']}:{k5}{rl['c_dscr']})", stijl.FMT_RATIO)
 		self._schrijf_structuur(ws)
 
 	def _schrijf_structuur(self, ws):
@@ -1382,15 +1397,15 @@ class Bouwer:
 			return None if waarde is None or pd.isna(waarde) else float(waarde)
 
 		regels = [
-			("dc_multiple", getal("Debt_Capacity_Multiple"), stijl.FMT_MULT_2, rij.get("Debt_Capacity_Status", "")),
+			("dc_multiple", getal("Debt_Capacity_Multiple"), stijl.FMT_MULT, rij.get("Debt_Capacity_Status", "")),
 			("dc_eur", getal("Debt_Capacity_EUR"), stijl.FMT_BEDRAG, None),
 			("dc_binding", rij.get("Debt_Capacity_Bindend") or "-", "@", None),
-			("atp_senior", getal("ATP_Senior_Multiple"), stijl.FMT_MULT_2, None),
-			("atp_multiple", getal("ATP_Max_Entry_Multiple"), stijl.FMT_MULT_2, rij.get("ATP_Status", "")),
+			("atp_senior", getal("ATP_Senior_Multiple"), stijl.FMT_MULT, None),
+			("atp_multiple", getal("ATP_Max_Entry_Multiple"), stijl.FMT_MULT, rij.get("ATP_Status", "")),
 			("atp_ev", getal("ATP_Max_EV"), stijl.FMT_BEDRAG, None),
 			("atp_headroom", None if getal("ATP_Headroom_Pct") is None else getal("ATP_Headroom_Pct") / 100, stijl.FMT_PCT, None),
 			("atp_equity", getal("ATP_Max_Equity_Price"), stijl.FMT_BEDRAG, None),
-			("atp_ai_multiple", getal("ATP_AI_Max_Entry_Multiple"), stijl.FMT_MULT_2, rij.get("ATP_AI_Status", "")),
+			("atp_ai_multiple", getal("ATP_AI_Max_Entry_Multiple"), stijl.FMT_MULT, rij.get("ATP_AI_Status", "")),
 			(
 				"atp_ai_headroom",
 				None if getal("ATP_AI_Headroom_Pct") is None else getal("ATP_AI_Headroom_Pct") / 100,
@@ -1485,7 +1500,7 @@ class Bouwer:
 		nr += 1
 		links = [
 			("x_irr", f"={ZIJDE_LBO}C{rl['x_irr']}", stijl.FMT_PCT),
-			("x_moic", f"={ZIJDE_LBO}C{rl['x_moic']}", stijl.FMT_MULT_2),
+			("x_moic", f"={ZIJDE_LBO}C{rl['x_moic']}", stijl.FMT_MULT),
 			("entry_ebitda", f"={ZIJDE_LBO}C{rl['entry_ebitda_rij']}", stijl.FMT_BEDRAG),
 			("entry_ev", f"={ZIJDE_LBO}C{rl['entry_ev_rij']}", stijl.FMT_BEDRAG),
 			("eq_price", f"={ZIJDE_LBO}C{rl['eq_price_rij']}", stijl.FMT_BEDRAG),
@@ -1493,11 +1508,11 @@ class Bouwer:
 			("x_ev", f"={ZIJDE_LBO}C{rl['x_ev']}", stijl.FMT_BEDRAG),
 			("x_equity", f"={ZIJDE_LBO}C{rl['x_equity']}", stijl.FMT_BEDRAG),
 			("x_covenants", f"={ZIJDE_LBO}C{rl['x_covenants']}", "@"),
-			("x_peak_lev", f"={ZIJDE_LBO}C{rl['x_peak_lev']}", stijl.FMT_MULT_2),
-			("x_lev", f"={ZIJDE_LBO}C{rl['x_lev']}", stijl.FMT_MULT_2),
-			("x_min_dscr", f"={ZIJDE_LBO}C{rl['x_min_dscr']}", stijl.FMT_MULT_2),
-			("dc_multiple", f"={ZIJDE_LBO}C{rl['dc_multiple']}", stijl.FMT_MULT_2),
-			("atp_multiple", f"={ZIJDE_LBO}C{rl['atp_multiple']}", stijl.FMT_MULT_2),
+			("x_peak_lev", f"={ZIJDE_LBO}C{rl['x_peak_lev']}", stijl.FMT_MULT),
+			("x_lev", f"={ZIJDE_LBO}C{rl['x_lev']}", stijl.FMT_MULT),
+			("x_min_dscr", f"={ZIJDE_LBO}C{rl['x_min_dscr']}", stijl.FMT_RATIO),
+			("dc_multiple", f"={ZIJDE_LBO}C{rl['dc_multiple']}", stijl.FMT_MULT),
+			("atp_multiple", f"={ZIJDE_LBO}C{rl['atp_multiple']}", stijl.FMT_MULT),
 			("atp_headroom", f"={ZIJDE_LBO}C{rl['atp_headroom']}", stijl.FMT_PCT),
 		]
 		for sleutel, formule, fmt in links:
@@ -1531,9 +1546,9 @@ class Bouwer:
 			("senior", "model", stijl.FMT_BEDRAG),
 			("rcf", "model", stijl.FMT_BEDRAG),
 			("nd_bank", "lbo", stijl.FMT_BEDRAG),
-			("c_lev", "lbo", stijl.FMT_MULT_2),
-			("c_dscr", "lbo", stijl.FMT_MULT_2),
-			("c_icr", "lbo", stijl.FMT_MULT_2),
+			("c_lev", "lbo", stijl.FMT_MULT),
+			("c_dscr", "lbo", stijl.FMT_RATIO),
+			("c_icr", "lbo", stijl.FMT_RATIO),
 		]
 		for sleutel, blad, fmt in trend:
 			zijde = ZIJDE_MODEL if blad == "model" else ZIJDE_LBO
@@ -1562,11 +1577,12 @@ class Bouwer:
 		modellen = [rij["LBO_Scenarios"][scenario] for scenario in assumpties.MODEL_SCENARIOS]
 		metrieken = [
 			("x_irr", lambda m: m["LBO_IRR_Exact_Pct"] / 100, stijl.FMT_PCT),
-			("x_moic", lambda m: m["LBO_MoIC_Exact"], stijl.FMT_MULT_2),
+			("x_moic", lambda m: m["LBO_MoIC_Exact"], stijl.FMT_MULT),
 			("x_ebitda", lambda m: m["LBO_EBITDA_Jaar5"], stijl.FMT_BEDRAG),
-			("x_min_dscr", lambda m: m["LBO_Laagste_DSCR"], stijl.FMT_MULT_2),
-			("x_peak_lev", lambda m: m["LBO_Hoogste_Leverage"], stijl.FMT_MULT_2),
-			("d_rcf", lambda m: m["LBO_RCF_Piek"], stijl.FMT_BEDRAG),
+			("x_min_dscr", lambda m: m["LBO_Laagste_DSCR"], stijl.FMT_RATIO),
+			("x_peak_lev", lambda m: m["LBO_Hoogste_Leverage"], stijl.FMT_MULT),
+			("rcf_peak", lambda m: m["LBO_RCF_Piek"], stijl.FMT_BEDRAG),
+			("rcf_exit", lambda m: m["LBO_RCF_Eind"], stijl.FMT_BEDRAG),
 		]
 		for sleutel, ophalen, fmt in metrieken:
 			self._label(ws, nr, labels.ROW_LABELS[sleutel])
@@ -1655,6 +1671,9 @@ def bouw_werkboek(rij, historiek):
 	bouwer.schrijf_lbo()
 	bouwer.schrijf_samenvatting()
 	bouwer.schrijf_namen()
+	for ws in (bouwer.ws_inp, bouwer.ws_model, bouwer.ws_lbo):
+		stijl.afdruk(ws, rij["Bedrijfsnaam"])
+	stijl.afdruk(bouwer.ws_samenvatting, rij["Bedrijfsnaam"], titelkolommen=None)
 	return bouwer.wb, bouwer.kaart()
 
 

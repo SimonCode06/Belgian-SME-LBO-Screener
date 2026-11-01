@@ -416,7 +416,7 @@ LEDGER_EMPTY = "No adjustments proposed"
 LEDGER_TOTAL = "Approved EBITDA Adjustments"
 SECTION_SU = "SOURCES & USES"
 SECTION_DEBT = "DEBT SCHEDULE"
-SECTION_INTEREST = "INTEREST"
+SECTION_INTEREST = "INTEREST (ON OPENING BALANCES: NO CIRCULAR REFERENCE; RATE IN COLUMN B)"
 SECTION_WATERFALL = "CASH FLOW WATERFALL"
 SECTION_COVENANTS = "COVENANTS"
 SECTION_EXIT = "EXIT AND RETURNS"
@@ -561,12 +561,16 @@ ROW_LABELS = {
 	"d_draw": "Drawdown",
 	"d_repay": "Repayment",
 	"d_rcf": "RCF: Closing",
+	"rcf_peak": "RCF Peak Drawn",
+	"rcf_exit": "RCF Balance at Exit",
 	"d_rcf_room": "RCF: Undrawn Headroom",
-	"d_vendor": "Vendor Loan: Closing (Bullet at Exit, PIK Interest Accrued)",
+	"d_vendor_open": "Vendor Loan: Opening",
+	"d_pik": "PIK Interest Capitalised",
+	"d_vendor": "Vendor Loan: Closing (Bullet at Exit)",
 	"i_senior": "Interest Senior Term Loan",
 	"i_rcf": "Interest RCF",
 	"i_commit": "Commitment Fee RCF",
-	"i_vendor": "Interest Vendor Loan",
+	"i_vendor": "Interest Vendor Loan (PIK if Capitalised Above)",
 	"i_total": "Total Cash Interest",
 	"i_income": "Interest Income on Cash",
 	"w_ebitda": "Adjusted EBITDA",
@@ -680,6 +684,7 @@ FOOTER_VERSION = "Model version"
 FOOTER_GEMINI = "Gemini model"
 FOOTER_SOURCE = "Source file"
 FOOTER_RUN = "Run manifest"
+FOOTER_CONFIDENTIAL = "Strictly private and confidential"
 
 GROUP_IDENTIFICATION = "IDENTIFICATION & ASSESSMENT"
 GROUP_TRENDS = "MULTI-YEAR TREND & MARGINS"
