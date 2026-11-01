@@ -189,7 +189,15 @@ def test_override_flows_through_and_the_balance_still_closes(excel, tmp_path, ri
 		irr_voor = open_wb.cel("lbo", "x_irr")
 		ebitda_voor = open_wb.rij("model", "ebitda")
 		assert open_wb.inp.Range(kaart["overrides_cel"]).Value == 0
-		assert open_wb.samenvatting.Range(kaart["actief_cel"]).Value == labels.ACTIVE_WORKS
+		# The live check must agree with Python: covenants met, IRR at or above target, RCF repaid at exit
+		base = df_rij["LBO_Scenarios"]["base"]
+		werkt = (
+			base["LBO_Convenanten"] == labels.COVENANTS_OK
+			and base["LBO_IRR_Exact_Pct"] >= config.LBO_MIN_IRR_PCT
+			and base["LBO_RCF_Eind"] <= 1.0
+		)
+		verwacht = labels.ACTIVE_WORKS if werkt else labels.ACTIVE_FAILS
+		assert open_wb.samenvatting.Range(kaart["actief_cel"]).Value == verwacht
 
 		open_wb.override("base", "inkoop_pct", 3, 0.63)
 		open_wb.override("base", "dso", 2, 80)
@@ -307,7 +315,9 @@ def test_company_without_lbo_gets_a_summary_tab_only(tmp_path, cijfers, filings,
 	assert boek.sheetnames == [labels.TAB_SUMMARY]
 	assert "No LBO projection possible" in str(boek[labels.TAB_SUMMARY]["A3"].value)
 	volledig = openpyxl.load_workbook(next(pad for pad in paden if "Testco" in pad.name))
-	assert volledig.sheetnames == [labels.TAB_SUMMARY, labels.TAB_INPUTS, labels.TAB_MODEL, labels.TAB_LBO, labels.TAB_RISKS]
+	assert volledig.sheetnames == [
+		labels.TAB_SUMMARY, labels.TAB_INPUTS, labels.TAB_MODEL, labels.TAB_LBO, labels.TAB_SENSITIVITIES, labels.TAB_RISKS,
+	]
 
 
 def test_workbook_standard(rij, tmp_path, filings):
@@ -326,7 +336,7 @@ def test_workbook_standard(rij, tmp_path, filings):
 	assert override.fill.fgColor.rgb.endswith("FFF2CC") and override.font.color.rgb.endswith("0000FF")
 	assert model[f"{eerste}{rijen['rev']}"].font.color.rgb.endswith("000000")
 	assert model[f"{eerste}{rijen['int_exp']}"].font.color.rgb.endswith("006100")
-	assert model[f"{eerste}{rijen['rev']}"].number_format == '#,##0,_);(#,##0,);"-"_)'
+	assert model[f"{eerste}{rijen['rev']}"].number_format == '#,##0,_);(#,##0,);"–"_)'
 	assert model[f"{eerste}{rijen['a_prijsgroei']}"].number_format == "0.0%"
 	assert 0 < inp[f"{eerste}{ri['ai_base_prijsgroei']}"].value < 1
 	assert model["A1"].fill.fgColor.rgb.endswith("1F3864")
