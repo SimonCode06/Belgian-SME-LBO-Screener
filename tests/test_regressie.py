@@ -140,7 +140,7 @@ def test_testco_ai_assumpties(filings, cijfers):
 	vergelijk_met_baseline(BASELINE / "testco.json", kerncijfers(df.iloc[0]))
 
 
-def _cloudar_rij():
+def _cloudar_rij(assumpties_pad=None):
 	csvs = sorted(BASELINE_LOKAAL.glob("Cloudar_JR*.csv"))
 	bedrijf = groepeer_per_bedrijf([lees_neerlegging(pad) for pad in csvs])[0]
 	cijfers = bouw_cijfers(bedrijf)
@@ -149,7 +149,7 @@ def _cloudar_rij():
 	tekst = json.loads((BASELINE_LOKAAL / "cloudar_tekst.json").read_text(encoding="utf-8"))
 	velden = app.koppel_tekst(cijfers, tekst, bedrijf[-1].codes, paginas)
 
-	data = json.loads((BASELINE_LOKAAL / "cloudar_assumpties.json").read_text(encoding="utf-8"))
+	data = json.loads((assumpties_pad or BASELINE_LOKAAL / "cloudar_assumpties.json").read_text(encoding="utf-8"))
 	antwoord = AssumptieAntwoord.model_validate({k: v for k, v in data.items() if k != "Gebruikt_Model"})
 	pack = pack_uit_antwoord(antwoord)
 	citaten.controleer_assumpties(pack, paginas, SCENARIOS)

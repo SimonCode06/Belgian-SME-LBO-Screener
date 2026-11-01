@@ -301,12 +301,16 @@ def test_a_plausible_ai_case_gets_no_ebitda_flags(cijfers, filings):
 	assert not any("credible setback" in regel or "above the trend" in regel for regel in regels)
 
 
-@pytest.mark.skipif(not ECHT, reason="tests/baseline_local ontbreekt")
+@pytest.mark.skipif(
+	not (BASELINE_LOKAAL / "cloudar_assumpties_2026-10-31.json").exists(), reason="tests/baseline_local ontbreekt"
+)
 def test_cached_cloudar_set_gets_both_flags():
+	"""The assumption set of 31 Oct 2026 (before the Economics block) is the case the audit criticised."""
 	from src.calculations import bouw_dataframe
 	from tests.test_regressie import _cloudar_rij
 
-	vlaggen = bouw_dataframe([_cloudar_rij()]).iloc[0]["LBO_Assumptie_Vlaggen"]
+	rij = _cloudar_rij(BASELINE_LOKAAL / "cloudar_assumpties_2026-10-31.json")
+	vlaggen = bouw_dataframe([rij]).iloc[0]["LBO_Assumptie_Vlaggen"]
 	assert any("EUR 29,988" in vlag and "EUR 1,768,845" in vlag for vlag in vlaggen)
 	assert any("+10.5%" in vlag and "-8.6%" in vlag for vlag in vlaggen)
 
