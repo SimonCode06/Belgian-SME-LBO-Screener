@@ -34,6 +34,8 @@ DUBBEL = Side(style="double", color="000000")
 
 RAND_SUBTOTAAL = Border(top=DUN)
 RAND_EINDTOTAAL = Border(top=DUN, bottom=DUBBEL)
+DIK = Side(style="medium", color="000000")
+RAND_BASIS = Border(left=DIK, right=DIK, top=DIK, bottom=DIK)
 RAND_OVERRIDE = Border(left=DUN_GRIJS, right=DUN_GRIJS, top=DUN_GRIJS, bottom=DUN_GRIJS)
 
 ERNST_KLEUR = {"hoog": ROOD, "middel": "9C6500", "laag": "595959"}

@@ -18,13 +18,13 @@ from typing import Callable, Optional
 
 import pandas as pd
 from openpyxl import Workbook
-from openpyxl.formatting.rule import CellIsRule, DataBarRule
+from openpyxl.formatting.rule import CellIsRule, ColorScaleRule, DataBarRule
 from openpyxl.styles import Alignment
 from openpyxl.utils import get_column_letter
 from openpyxl.workbook.defined_name import DefinedName
 from openpyxl.worksheet.datavalidation import DataValidation
 
-from . import assumpties, config, labels, normalisaties
+from . import assumpties, config, labels, normalisaties, sensitiviteit
 from . import excel_stijl as stijl
 from .lbo_model import net_debt_formule
 
@@ -768,7 +768,9 @@ class Bouwer:
 		self.ws_inp = self.wb.create_sheet(labels.TAB_INPUTS)
 		self.ws_model = self.wb.create_sheet(labels.TAB_MODEL)
 		self.ws_lbo = self.wb.create_sheet(labels.TAB_LBO)
+		self.ws_sens = self.wb.create_sheet(labels.TAB_SENSITIVITIES)
 		self.ws_risico = self.wb.create_sheet(labels.TAB_RISKS)
+		self.sens_basis = []
 		self.override_cellen = []
 
 	# ------------------------------------------------------------------ row layout
@@ -1710,6 +1712,63 @@ class Bouwer:
 		ws.print_area = f"A1:{get_column_letter(self.kol.laatste_jaar)}{self.samenvatting_einde}"
 		ws.sheet_properties.pageSetUpPr.fitToPage = True
 
+	def schrijf_sensitiviteiten(self):
+		"""Two IRR grids from Python (static), coloured around the target IRR, the base cell boxed."""
+		ws = self.ws_sens
+		self._kop(ws, labels.TITLE_SENSITIVITIES, "sens", jaren=False)
+		cel = ws.cell(row=3, column=1, value=labels.SENSITIVITY_DISCLAIMER)
+		cel.font = stijl.lettertype(stijl.ROOD, vet=True, cursief=True)
+		ws.cell(row=4, column=1, value=labels.SENSITIVITY_LEGEND).font = stijl.lettertype(cursief=True, grootte=8)
+		tabellen = sensitiviteit.analyseer(self.rij)
+		if tabellen is None:
+			ws.cell(row=6, column=1, value=labels.SENS_NONE).font = stijl.lettertype(vet=True)
+			return
+		nr = self._sens_tabel(
+			ws, 6, labels.SECTION_SENS_MULTIPLES, tabellen["instap_exit"],
+			labels.SENS_ENTRY, labels.SENS_EXIT, stijl.FMT_MULT, stijl.FMT_MULT,
+		)
+		self._sens_tabel(
+			ws, nr + 1, labels.SECTION_SENS_EBITDA, tabellen["ebitda_senior"],
+			labels.SENS_EBITDA, labels.SENS_SENIOR, '+0%;-0%;0%', stijl.FMT_MULT,
+		)
+
+	def _sens_tabel(self, ws, nr, titel, tabel, rij_label, kolom_label, rij_fmt, kolom_fmt):
+		laatste = 3 + len(tabel.kolommen)
+		self._sectie(ws, nr, titel, laatste)
+		nr += 1
+		kop = ws.cell(row=nr, column=1, value=f"{rij_label} \u2193   /   {kolom_label} \u2192")
+		kop.font = stijl.lettertype(vet=True)
+		for index, waarde in enumerate(tabel.kolommen):
+			cel = self._zet(ws, nr, 4 + index, waarde, kolom_fmt, vet=True)
+			cel.alignment = Alignment(horizontal="center")
+			cel.border = stijl.Border(bottom=stijl.DUN)
+		eerste = nr + 1
+		midden = len(tabel.rijen) // 2, len(tabel.kolommen) // 2
+		for i, rij_waarde in enumerate(tabel.rijen):
+			nr += 1
+			cel = self._zet(ws, nr, 3, rij_waarde, rij_fmt, vet=True)
+			cel.alignment = Alignment(horizontal="center")
+			cel.border = stijl.Border(right=stijl.DUN)
+			for j, irr in enumerate(tabel.irr[i]):
+				fmt = stijl.FMT_PCT + ('"\u2020"' if tabel.breuk[i][j] else "")
+				cel = self._zet(ws, nr, 4 + j, "n.m." if irr is None else irr, fmt)
+				cel.alignment = Alignment(horizontal="center")
+				if (i, j) == midden:
+					cel.border = stijl.RAND_BASIS
+					cel.font = stijl.lettertype(stijl.BLAUW, vet=True)
+					self.sens_basis.append(cel.coordinate)
+		bereik = f"D{eerste}:{get_column_letter(laatste)}{nr}"
+		doel = config.LBO_MIN_IRR_PCT / 100
+		ws.conditional_formatting.add(
+			bereik,
+			ColorScaleRule(
+				start_type="num", start_value=0, start_color="F8696B",
+				mid_type="num", mid_value=doel, mid_color="FFEB84",
+				end_type="num", end_value=2 * doel, end_color="63BE7B",
+			),
+		)
+		return nr + 1
+
 	def schrijf_risico(self):
 		"""Risks & Adjustments: the long text blocks that do not fit on the one-pager."""
 		ws = self.ws_risico
@@ -1774,6 +1833,7 @@ class Bouwer:
 			"scenario_cel": f"C{self.scenario_rij}",
 			"overrides_cel": self.overrides_cel,
 			"actief_cel": self.actief_cel,
+			"sens_basis": self.sens_basis,
 			"checks_cel": self.checks_totaal,
 		}
 
@@ -1788,11 +1848,13 @@ def bouw_werkboek(rij, historiek):
 	bouwer.schrijf_model()
 	bouwer.schrijf_lbo()
 	bouwer.schrijf_samenvatting()
+	bouwer.schrijf_sensitiviteiten()
 	bouwer.schrijf_risico()
 	bouwer.schrijf_namen()
 	for ws in (bouwer.ws_inp, bouwer.ws_model, bouwer.ws_lbo):
 		stijl.afdruk(ws, rij["Bedrijfsnaam"])
 	stijl.afdruk(bouwer.ws_risico, rij["Bedrijfsnaam"], titelrijen="1:2", titelkolommen=None)
+	stijl.afdruk(bouwer.ws_sens, rij["Bedrijfsnaam"], titelrijen=None, titelkolommen=None, een_pagina=True)
 	stijl.afdruk(bouwer.ws_samenvatting, rij["Bedrijfsnaam"], titelrijen=None, titelkolommen=None, een_pagina=True)
 	return bouwer.wb, bouwer.kaart()
 
@@ -1801,7 +1863,7 @@ def bouw_lege_fiche(rij, historiek):
 	"""A company without a calculable LBO: the message, the actuals and the text blocks."""
 	bouwer = Bouwer(rij, historiek)
 	ws = bouwer.ws_samenvatting
-	for naam in (labels.TAB_INPUTS, labels.TAB_MODEL, labels.TAB_LBO, labels.TAB_RISKS):
+	for naam in (labels.TAB_INPUTS, labels.TAB_MODEL, labels.TAB_LBO, labels.TAB_SENSITIVITIES, labels.TAB_RISKS):
 		del bouwer.wb[naam]
 	ws.sheet_view.showGridLines = False
 	ws.column_dimensions["A"].width = 52
