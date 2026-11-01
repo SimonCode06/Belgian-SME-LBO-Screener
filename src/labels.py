@@ -456,6 +456,12 @@ SECTION_RETURNS = "RETURNS AND CREDIT: SCREENING CASE VS ANALYST CASE"
 COLUMN_ACTIVE = "Active (Live)"
 RETURNS_NOTE = "Scenario columns: Python on the proposed assumptions, they do not follow overrides. Active: live, follows the inputs tab."
 SECTION_DEAL = "TRANSACTION AND STRUCTURE"
+SECTION_VALUE_CREATION = "VALUE CREATION BRIDGE (LIVE, ACTIVE SCENARIO)"
+VC_HEADERS = ("EUR", "Base", "Total", "Increase", "Decrease", "Chart Label")
+VC_SHORT = {
+	"vc_start": "Entry equity", "vc_growth": "EBITDA growth", "vc_multiple": "Multiple", "vc_debt": "Net debt paydown",
+	"vc_fees": "Fees", "vc_div": "Dividends", "vc_end": "Exit equity + div.",
+}
 TAB_SENSITIVITIES = "Sensitivities"
 TITLE_SENSITIVITIES = "SENSITIVITIES"
 SENSITIVITY_DISCLAIMER = (
@@ -626,6 +632,14 @@ ROW_LABELS = {
 	"d_draw": "Drawdown",
 	"d_repay": "Repayment",
 	"d_rcf": "RCF: Closing",
+	"vc_start": "Sponsor Equity at Entry",
+	"vc_growth": "EBITDA Growth (at Entry Multiple)",
+	"vc_multiple": "Multiple Expansion / (Contraction)",
+	"vc_debt": "Net Debt Reduction (Debt Paydown and Cash Build, after PIK)",
+	"vc_fees": "Transaction and Financing Fees",
+	"vc_div": "Dividends to Sponsor",
+	"vc_end": "Exit Equity + Dividends",
+	"vc_check": "Check: Bridge vs Exit Equity + Dividends (Should Be 0)",
 	"rcf_peak": "RCF Peak Drawn",
 	"rcf_exit": "RCF Balance at Exit",
 	"d_rcf_room": "RCF: Undrawn Headroom",

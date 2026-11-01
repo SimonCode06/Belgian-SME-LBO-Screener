@@ -124,6 +124,10 @@ def vergelijk_scenario(open_wb, rij, scenario):
 	assert open_wb.cel("lbo", "x_equity") == pytest.approx(model["LBO_Exit_Equity_Jaar5"], abs=TOLERANTIE_EUR), scenario
 	assert open_wb.cel("lbo", "x_covenants") == model["LBO_Convenanten"].split(":")[0], scenario
 	assert open_wb.checks() == labels.CHECK_OK, scenario
+	# Value creation bridge: closes to exit equity + dividends in every scenario
+	assert abs(open_wb.cel("lbo", "vc_check")) <= TOLERANTIE_EUR, scenario
+	doel = model["LBO_Exit_Equity_Jaar5"] + model["LBO_Dividend_Cumulatief"]
+	assert open_wb.cel("lbo", "vc_end") == pytest.approx(doel, abs=TOLERANTIE_EUR), scenario
 
 
 @pytest.mark.parametrize("scenario", assumpties.MODEL_SCENARIOS)

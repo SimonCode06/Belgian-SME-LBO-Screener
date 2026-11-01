@@ -18,6 +18,7 @@ from typing import Callable, Optional
 
 import pandas as pd
 from openpyxl import Workbook
+from openpyxl.chart import BarChart, Reference
 from openpyxl.formatting.rule import CellIsRule, ColorScaleRule, DataBarRule
 from openpyxl.styles import Alignment
 from openpyxl.utils import get_column_letter
@@ -608,6 +609,10 @@ STRUCTUUR_RIJEN = (
 INGEKLAPTE_GROEPEN = ("settings",)  # technical switches: grouped and collapsed by default
 
 
+GRAFIEK_RIJEN = 18  # room for the value creation chart below the bridge
+VC_RIJEN = ("vc_start", "vc_growth", "vc_multiple", "vc_debt", "vc_fees", "vc_div", "vc_end", "vc_check")
+
+
 def _invoer(rij):
 	"""The transaction inputs: (group, name, value, format). All are blue, all live."""
 	bank = config.NET_DEBT_DEFINITIES["bank_covenant"]
@@ -889,6 +894,14 @@ class Bouwer:
 		for sleutel in STRUCTUUR_RIJEN:
 			self.r["lbo"][sleutel] = rij_nr
 			rij_nr += 1
+		rij_nr += 1
+		self.vc_start = rij_nr
+		rij_nr += 2  # section and column headers
+		for sleutel in VC_RIJEN:
+			self.r["lbo"][sleutel] = rij_nr
+			rij_nr += 1
+		self.grafiek_rij = rij_nr + 1
+		rij_nr += GRAFIEK_RIJEN
 		self.lbo_einde = rij_nr
 
 	# ------------------------------------------------------------------ cell helpers
@@ -1402,6 +1415,7 @@ class Bouwer:
 		self._label(ws, rl["x_min_dscr"], labels.ROW_LABELS["x_min_dscr"])
 		self._zet(ws, rl["x_min_dscr"], 3, f"=MIN({jaren_k}{rl['c_dscr']}:{k5}{rl['c_dscr']})", stijl.FMT_RATIO)
 		self._schrijf_structuur(ws)
+		self._schrijf_waardecreatie(ws)
 
 	def _schrijf_structuur(self, ws):
 		"""Debt capacity and ability-to-pay: Python results (bisection), plus one live covenant test."""
@@ -1452,7 +1466,7 @@ class Bouwer:
 			ws, rl["dc_live"], 3,
 			f'=IF(Scenario="{naam}",IF({test},"{labels.YES}","{labels.NO}"),"{labels.STRUCTURE_SELECT_STRESS}")',
 			"@", vet=True,
-		)
+		).alignment = Alignment(horizontal="left")
 
 	# ------------------------------------------------------------------ executive summary
 	def _paar(self, ws, nr, label, waarde, fmt, kolom=1, waarde_kolom=3, vet=False):
@@ -1477,6 +1491,83 @@ class Bouwer:
 		breedte = (tot - kolom + 1) * 13 * 1.2 * (10 / grootte)
 		regels = sum(max(1, int(len(deel) / breedte) + 1) for deel in tekst.split("\n"))
 		ws.row_dimensions[nr].height = max(13, 11.5 * regels + 2)
+
+	def _schrijf_waardecreatie(self, ws):
+		"""Value creation bridge from the sponsor equity at entry to exit equity plus dividends, live.
+
+		EBITDA growth at the entry multiple, multiple expansion on the exit EBITDA, net debt reduction
+		(debt raised at closing less exit net debt, after PIK and cash build), fees, dividends. The
+		check row is zero by construction; the chart is a stacked bar with an invisible base series.
+		"""
+		rl = self.r["lbo"]
+		k5 = get_column_letter(self.kol.laatste_jaar)
+		eerste = get_column_letter(self.kol.jaren[0])
+		self._sectie(ws, self.vc_start, labels.SECTION_VALUE_CREATION)
+		kop = self.vc_start + 1
+		for kolom, tekst in enumerate(labels.VC_HEADERS, start=3):
+			cel = ws.cell(row=kop, column=kolom, value=tekst)
+			cel.font = stijl.lettertype(vet=kolom == 3, grootte=8 if kolom > 3 else stijl.GROOTTE, cursief=kolom > 3)
+			cel.alignment = Alignment(horizontal="right")
+		ebitda_5 = f"MAX(C{rl['x_ebitda']},0)"
+		stappen = [
+			("vc_start", "=Sponsor_Equity"),
+			("vc_growth", f"=({ebitda_5}-Entry_EBITDA)*Entry_Multiple"),
+			("vc_multiple", f"={ebitda_5}*(C{rl['x_mult']}-Entry_Multiple)"),
+			("vc_debt", f"=Senior_Amount+Vendor_Amount+RCF_At_Closing-C{rl['x_nd']}"),
+			("vc_fees", "=-(Transaction_Fees+Financing_Fees)"),
+			("vc_div", f"=SUM({eerste}{rl['w_div']}:{k5}{rl['w_div']})"),
+		]
+		for sleutel, formule in stappen:
+			nr = rl[sleutel]
+			self._label(ws, nr, labels.ROW_LABELS[sleutel], vet=sleutel == "vc_start")
+			self._zet(ws, nr, 3, formule, stijl.FMT_BEDRAG, vet=sleutel == "vc_start")
+		eind = rl["vc_end"]
+		self._label(ws, eind, labels.ROW_LABELS["vc_end"], vet=True)
+		self._zet(ws, eind, 3, f"=SUM(C{rl['vc_start']}:C{rl['vc_div']})", stijl.FMT_BEDRAG, vet=True)
+		self._rij_stijl(ws, eind, "eindtotaal", 3)
+		self._label(ws, rl["vc_check"], labels.ROW_LABELS["vc_check"])
+		self._zet(ws, rl["vc_check"], 3, f"=C{eind}-(C{rl['x_equity']}+C{rl['vc_div']})", stijl.FMT_BEDRAG)
+
+		# Chart helper columns D:G (base, total, increase, decrease): the base series is drawn without fill
+		for sleutel in VC_RIJEN[:-1]:
+			nr = rl[sleutel]
+			if sleutel in ("vc_start", "vc_end"):
+				waarden = ("=0", f"=MAX(C{nr},0)", "=0", "=0")
+			else:
+				voor = f"SUM(C${rl['vc_start']}:C{nr - 1})"
+				na = f"SUM(C${rl['vc_start']}:C{nr})"
+				waarden = (f"=MAX(0,MIN({voor},{na}))", "=0", f"=MAX(C{nr},0)", f"=MAX(-C{nr},0)")
+			for kolom, formule in enumerate(waarden, start=4):
+				cel = self._zet(ws, nr, kolom, formule, stijl.FMT_BEDRAG)
+				cel.font = stijl.lettertype(grootte=8, cursief=True)
+			kort = ws.cell(row=nr, column=8, value=labels.VC_SHORT[sleutel])
+			kort.font = stijl.lettertype(grootte=8, cursief=True)
+		self._waterval(ws)
+
+	def _waterval(self, ws):
+		rl = self.r["lbo"]
+		eerste, laatste = rl["vc_start"], rl["vc_end"]
+		grafiek = BarChart()
+		grafiek.type = "col"
+		grafiek.grouping = "stacked"
+		grafiek.overlap = 100
+		grafiek.gapWidth = 60
+		grafiek.y_axis.title = labels.UNITS_NOTE
+		grafiek.y_axis.numFmt = "#,##0,"
+		grafiek.y_axis.majorGridlines = None
+		grafiek.legend = None
+		gegevens = Reference(ws, min_col=4, max_col=7, min_row=self.vc_start + 1, max_row=laatste)
+		grafiek.add_data(gegevens, titles_from_data=True)
+		grafiek.set_categories(Reference(ws, min_col=8, min_row=eerste, max_row=laatste))
+		for reeks, kleur in zip(grafiek.series, (None, stijl.KOP_DONKER, "63BE7B", "F8696B")):
+			if kleur is None:
+				reeks.graphicalProperties.noFill = True
+				reeks.graphicalProperties.line.noFill = True
+			else:
+				reeks.graphicalProperties.solidFill = kleur
+				reeks.graphicalProperties.line.solidFill = kleur
+		grafiek.width, grafiek.height = 24, 8
+		ws.add_chart(grafiek, f"A{self.grafiek_rij}")
 
 	def schrijf_samenvatting(self):
 		"""The IC one-pager: verdict, live check, returns by case, structure, scorecard, risks, questions, trend."""
