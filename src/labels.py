@@ -223,6 +223,17 @@ OWNERSHIP_TYPES = {
 	"onbekend": "Ownership unknown",
 }
 OWNERSHIP_CONSOLIDATED = "consolidated"
+DEAL_PRIMARY = "Primary"
+DEAL_CARVE_OUT = "Carve-out"
+DEAL_SECONDARY = "Secondary"
+DEAL_UNKNOWN = "Unknown"
+DEAL_TYPES = {"zelfstandig": DEAL_PRIMARY, "groepsdochter": DEAL_CARVE_OUT, "pe_backed": DEAL_SECONDARY}
+DEAL_NOTE = {
+	DEAL_PRIMARY: "Owner-managed or independent: a primary buyout",
+	DEAL_CARVE_OUT: "Group subsidiary of {parent}: a carve-out (separation costs, transitional services, intercompany)",
+	DEAL_SECONDARY: "Already PE-backed{parent_text}: a secondary buyout",
+	DEAL_UNKNOWN: "Ownership not established from the annual report",
+}
 YES_NO_UNKNOWN = {"ja": "yes", "nee": "no", "onbekend": "unknown"}
 ADJUSTMENT_TYPES = {
 	"bestuurdersvergoeding": "Director remuneration",
@@ -787,6 +798,8 @@ COLUMN_LABELS = {
 	"LBO_Snapshot_Status": "Snapshot Status",
 	"Run_Manifest": "Run Manifest",
 	"Aantal_Hoge_Vlaggen": "Red Flags: High (Counted)",
+	"Dealtype": "Deal Type",
+	"Dealtype_Toelichting": "Deal Type: Note",
 	"Aantal_Middel_Vlaggen": "Red Flags: Medium (Counted)",
 	"Eigendom": "Ownership",
 	"AI_Business_Model": "Business Model (AI)",

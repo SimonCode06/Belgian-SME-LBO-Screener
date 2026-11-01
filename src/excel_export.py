@@ -48,6 +48,7 @@ OVERZICHT_KOLOMMEN = [
 	("Schema_Type", labels.GROUP_IDENTIFICATION, 12),
 	("LBO_Status", labels.GROUP_IDENTIFICATION, 36),
 	("Data_Volledigheid", labels.GROUP_IDENTIFICATION, 34),
+	("Dealtype", labels.GROUP_IDENTIFICATION, 12),
 	("Eigendom", labels.GROUP_IDENTIFICATION, 34),
 	("Omzet_of_Brutomarge", labels.GROUP_TRENDS, 15),
 	("Omzetgroei_Pct", labels.GROUP_TRENDS, 11),
@@ -101,6 +102,7 @@ TEKST_KOLOMMEN = {
 	"ATP_AI_Status",
 	"Red_Flags",
 	"Eigendom",
+	"Dealtype_Toelichting",
 	"Kwalitatief_LBO_Oordeel",
 	"AI_Business_Model",
 }

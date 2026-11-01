@@ -53,3 +53,25 @@ def test_analyst_case_flags_never_count(cijfers):
 def test_text_summary_shows_severity_and_source():
 	tekst = vlaggen.als_tekst([vlaggen._vlag("groepsvorderingen", "model + AI", "verbonden_partijen", "Group receivables", pagina=32)])
 	assert tekst == "[MEDIUM] Group receivables (model + AI, p. 32)"
+
+
+
+# --- 5.2 Deal type ------------------------------------------------------------------------
+
+import pytest  # noqa: E402
+
+
+@pytest.mark.parametrize(
+	"soort, verwacht",
+	[("zelfstandig", labels.DEAL_PRIMARY), ("groepsdochter", labels.DEAL_CARVE_OUT), ("pe_backed", labels.DEAL_SECONDARY), ("onbekend", labels.DEAL_UNKNOWN)],
+)
+def test_deal_type_from_ownership(cijfers, soort, verwacht):
+	eigendom = {"type": soort, "moederonderneming": "Groep NV", "ondernemingsnummer_moeder": None, "consoliderend": "ja", "pagina": 1, "citaat": "x"}
+	rij = bouw_dataframe([{**cijfers, "AI_Eigendom": eigendom}]).iloc[0]
+	assert rij["Dealtype"] == verwacht
+	if verwacht == labels.DEAL_CARVE_OUT:
+		assert "Groep NV" in rij["Dealtype_Toelichting"]
+
+
+def test_no_text_pass_gives_unknown(cijfers):
+	assert bouw_dataframe([cijfers]).iloc[0]["Dealtype"] == labels.DEAL_UNKNOWN

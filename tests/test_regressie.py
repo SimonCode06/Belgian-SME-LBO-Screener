@@ -96,6 +96,7 @@ def kerncijfers(rij):
 		},
 		"Aantal_Red_Flags": len(flags),
 		"Eigendom": rij["Eigendom"],
+		"Dealtype": rij["Dealtype"],
 		"Citaten": sorted(
 			f"{item['categorie']}: {item['citaat_status']}" for item in [*rij["AI_Normalisaties"], *rij["AI_Red_Flags"]]
 		),

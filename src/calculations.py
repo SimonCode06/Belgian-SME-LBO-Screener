@@ -37,6 +37,14 @@ def _groei_pct(huidig, vorig):
     return round((huidig - vorig) / abs(vorig) * 100, 2) if vorig != 0 else NIET_BESCHIKBAAR
 
 
+def _dealtype(eigendom):
+    """Primary, Carve-out, Secondary or Unknown, with a short note."""
+    soort = labels.DEAL_TYPES.get((eigendom or {}).get("type"), labels.DEAL_UNKNOWN)
+    moeder = (eigendom or {}).get("moederonderneming") or labels.TEXT_UNKNOWN
+    tekst = labels.DEAL_NOTE[soort].format(parent=moeder, parent_text=f" ({moeder})" if eigendom and eigendom.get("moederonderneming") else "")
+    return soort, tekst
+
+
 def bouw_dataframe(resultaten):
     df = pd.DataFrame(resultaten)
 
@@ -308,6 +316,10 @@ def bouw_dataframe(resultaten):
     # Phase 5.1: structured red flags (source, category, severity); the text column is the summary
     if "AI_Red_Flags" not in df:
         df["AI_Red_Flags"] = pd.Series([[] for _ in range(len(df))], index=df.index, dtype=object)
+    # Phase 5.2: deal type from the ownership in the annual report (text pass)
+    if "AI_Eigendom" not in df:
+        df["AI_Eigendom"] = pd.Series([None] * len(df), index=df.index, dtype=object)
+    df["Dealtype"], df["Dealtype_Toelichting"] = zip(*[_dealtype(eigendom) for eigendom in df["AI_Eigendom"]])
     df["Red_Flag_Lijst"] = pd.Series([vlaggen.bouw_vlaggen(r) for _, r in df.iterrows()], index=df.index, dtype=object)
     df["Red_Flags"] = [vlaggen.als_tekst(lijst) for lijst in df["Red_Flag_Lijst"]]
     df["Aantal_Hoge_Vlaggen"] = [vlaggen.tel(lijst, "hoog") for lijst in df["Red_Flag_Lijst"]]
@@ -525,6 +537,8 @@ def bouw_dataframe(resultaten):
         "Aantal_Middel_Vlaggen",
         "Red_Flag_Lijst",
         "Eigendom",
+        "Dealtype",
+        "Dealtype_Toelichting",
         "Kwalitatief_LBO_Oordeel",
         "AI_Business_Model",
         "AI_Normalisaties",
