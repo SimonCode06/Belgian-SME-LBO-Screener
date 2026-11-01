@@ -268,9 +268,14 @@ def _rijen_model():
 			jaar=constant("oth_nonop"),
 		),
 		Rij(
+			"nwc_norm",
+			closing=lambda c: "=0",
+			jaar=lambda c: "=Uses_NWC_Cash",
+		),
+		Rij(
 			"cash",
 			hist=lambda r: _waarde(r, "Cash"),
-			closing=lambda c: "=Min_Cash",
+			closing=lambda c: "=Min_Cash+Uses_NWC_Cash",
 			jaar=lambda c: f"={c.h('cf_end')}",
 		),
 		Rij(
@@ -335,6 +340,7 @@ def _rijen_model():
 		Rij("cf_inv", jaar=mutatie_activa("inv")),
 		Rij("cf_ar", jaar=mutatie_activa("ar")),
 		Rij("cf_oth", jaar=mutatie_activa("oth_op")),
+		Rij("cf_nwcn", jaar=mutatie_activa("nwc_norm")),
 		Rij("cf_ap", jaar=mutatie_passiva("ap")),
 		Rij("cf_adv", jaar=mutatie_passiva("adv")),
 		Rij("cf_soc", jaar=mutatie_passiva("soc")),
@@ -454,7 +460,7 @@ def _rijen_lbo():
 		Rij("w_capex", jaar=lambda c: f"=-{c.x('capex')}"),
 		Rij(
 			"w_twc",
-			jaar=lambda c: f"={c.x('cf_inv')}+{c.x('cf_ar')}+{c.x('cf_ap')}+{c.x('cf_adv')}",
+			jaar=lambda c: f"={c.x('cf_inv')}+{c.x('cf_ar')}+{c.x('cf_nwcn')}+{c.x('cf_ap')}+{c.x('cf_adv')}",
 		),
 		Rij("w_oth", jaar=lambda c: f"={c.x('cf_oth')}+{c.x('cf_soc')}+{c.x('cf_othl')}"),
 		Rij("w_int", jaar=lambda c: f"=-{c.h('i_total')}"),
@@ -599,6 +605,18 @@ def _invoer(rij):
 	]
 
 
+def _of_nul(waarde, terugval=0.0):
+	return terugval if waarde is None or pd.isna(waarde) else float(waarde)
+
+
+def _twc_laatste(rij):
+	"""TWC of the last actual year: the peg when no peg can be calculated, so the adjustment is 0."""
+	return sum(
+		_of_nul(rij[veld]) * teken
+		for veld, teken in (("Voorraden", 1), ("Handelsvorderingen", 1), ("Handelsschulden", -1), ("Ontvangen_Vooruitbetalingen", -1))
+	)
+
+
 def _enkelvoudig_lbo(rij):
 	"""Single-value blocks of the LBO tab: (key, name, kind, content, format, style, section)."""
 	return [
@@ -633,7 +651,16 @@ def _enkelvoudig_lbo(rij):
 			),
 			stijl.FMT_BEDRAG, "subtotaal",
 		),
-		("eq_price", "Equity_Purchase_Price", "f", lambda c: "=Entry_EV-Adjusted_Net_Debt", stijl.FMT_BEDRAG, "eindtotaal"),
+		("nwc_peg", "NWC_Peg", "i", _of_nul(rij["NWC_Peg"], _twc_laatste(rij)), stijl.FMT_BEDRAG, "normaal"),
+		(
+			"nwc_adj", "NWC_Adjustment", "f",
+			lambda c: f"={c.xa('inv')}+{c.xa('ar')}-{c.xa('ap')}-{c.xa('adv')}-NWC_Peg",
+			stijl.FMT_BEDRAG, "normaal",
+		),
+		(
+			"eq_price", "Equity_Purchase_Price", "f", lambda c: "=Entry_EV-Adjusted_Net_Debt+NWC_Adjustment",
+			stijl.FMT_BEDRAG, "eindtotaal",
+		),
 	]
 
 
@@ -652,12 +679,16 @@ def _bronnen_gebruik():
 		("u_debt", "Uses_Debt", "f", lambda c: "=Adjusted_Net_Debt", stijl.FMT_BEDRAG, "normaal"),
 		("u_trans", "Transaction_Fees", "f", lambda c: "=Entry_EV*Transaction_Fee_Pct", stijl.FMT_BEDRAG, "normaal"),
 		("u_fin", "Financing_Fees", "f", lambda c: "=Entry_EV*Financing_Fee_Pct", stijl.FMT_BEDRAG, "normaal"),
-		("u_total", "Total_Uses", "f", lambda c: "=Uses_Equity+Uses_Debt+Transaction_Fees+Financing_Fees", stijl.FMT_BEDRAG, "eindtotaal"),
+		("u_nwc", "Uses_NWC_Cash", "f", lambda c: "=-NWC_Adjustment", stijl.FMT_BEDRAG, "normaal"),
+		(
+			"u_total", "Total_Uses", "f", lambda c: "=Uses_Equity+Uses_Debt+Transaction_Fees+Financing_Fees+Uses_NWC_Cash",
+			stijl.FMT_BEDRAG, "eindtotaal",
+		),
 		("su_check", "SU_Check", "f", lambda c: "=ABS(Total_Sources-Total_Uses)", stijl.FMT_BEDRAG, "normaal"),
 		(
 			"goodwill_0", "Goodwill_At_Closing", "f",
 			lambda c: (
-				"=Entry_EV+Transaction_Fees-("
+				"=Entry_EV+NWC_Adjustment+Transaction_Fees-("
 				+ "+".join(c.xz(sleutel) for sleutel in ("ppe", "fin_fa", "inv", "ar", "oth_op", "oth_nonop"))
 				+ "+Min_Cash-"
 				+ "-".join(c.xz(sleutel) for sleutel in ("ap", "adv", "soc", "oth_l"))

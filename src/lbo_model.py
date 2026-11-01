@@ -55,7 +55,8 @@ VEREISTE_VELDEN = [
 ]
 
 # Werkkapitaalposten in de kasstroomtabel: een stijging van een activapost kost cash
-WERKKAPITAAL_ACTIVA = ("Voorraden", "Handelsvorderingen", "Overige_Activa_Operationeel")
+# NWC_Normalisatie: het werkkapitaal dat in jaar 1 wordt aangevuld (of vrijkomt) tot het normale niveau (de peg)
+WERKKAPITAAL_ACTIVA = ("Voorraden", "Handelsvorderingen", "Overige_Activa_Operationeel", "NWC_Normalisatie")
 WERKKAPITAAL_PASSIVA = ("Handelsschulden", "Vooruitbetalingen", "Sociale_Schulden", "Overige_Passiva")
 
 
@@ -297,11 +298,16 @@ def bereken_lbo(rij, scenario="base"):
 	kosten = transactiekosten + financieringskosten
 	senior_0 = ebitda_0 * senior_multiple
 	vendor = instap_ev * config.LBO_VENDOR_LOAN_PCT_EV
+	# De NWC-aanpassing verandert de prijs voor de verkoper, niet wat de sponsor inbrengt: het verschil
+	# blijft als cash in het bedrijf voor de normalisatie van het werkkapitaal in jaar 1
+	nwc_aanpassing = float(rij.get("NWC_Aanpassing", 0.0))
 	sponsor_equity = instap_ev + kosten - senior_0 - vendor
 	rcf_limiet = ebitda_0 * config.LBO_RCF_LIMIET_X_EBITDA
 	bronnen = senior_0 + vendor + sponsor_equity
+	nwc_aanpassing_0 = float(rij.get("NWC_Aanpassing", 0.0))
 	bestedingen = (
 		float(rij["Indicatieve_Equity_Value"]) + float(rij["Adjusted_Net_Debt"]) + transactiekosten + financieringskosten
+		- nwc_aanpassing_0  # cash die in het bedrijf blijft voor de normalisatie van het werkkapitaal
 	)
 
 	# 2. Openingsbalans na de overname
@@ -315,6 +321,7 @@ def bereken_lbo(rij, scenario="base"):
 		"Voorraden": float(rij["Voorraden"]),
 		"Handelsvorderingen": float(rij["Handelsvorderingen"]),
 		"Overige_Activa_Operationeel": float(rij["Open_Overige_Activa_Operationeel"]),
+		"NWC_Normalisatie": 0.0,
 		"Handelsschulden": float(rij["Handelsschulden"]),
 		"Vooruitbetalingen": float(rij["Ontvangen_Vooruitbetalingen"]),
 		"Sociale_Schulden": float(rij["Open_Sociale_Schulden"]),
@@ -335,7 +342,7 @@ def bereken_lbo(rij, scenario="base"):
 		+ sum(posten[post] for post in WERKKAPITAAL_ACTIVA)
 		- sum(posten[post] for post in WERKKAPITAAL_PASSIVA)
 	)
-	goodwill_0 = (instap_ev + transactiekosten) - netto_activa
+	goodwill_0 = (instap_ev + nwc_aanpassing + transactiekosten) - netto_activa
 
 	def balans(periode_label, periode_nr, **resultaat):
 		"""Eén kolom van het model: de balans wordt altijd volledig opnieuw opgeteld."""
@@ -367,7 +374,7 @@ def bereken_lbo(rij, scenario="base"):
 			"Net_Debt_Waardering": net_debt("waardering", financiele_schuld, cash, minimum_cash),
 		}
 
-	cash = minimum_cash
+	cash = minimum_cash - nwc_aanpassing
 	senior = senior_0
 	rcf = 0.0
 	eigen_vermogen = sponsor_equity
@@ -428,12 +435,15 @@ def bereken_lbo(rij, scenario="base"):
 			"Voorraden": driver("dio", jaar) / config.DAGEN_PER_JAAR * omzet_jaar * kosten_60,
 			"Handelsvorderingen": driver("dso", jaar) / config.DAGEN_PER_JAAR * omzet_jaar,
 			"Overige_Activa_Operationeel": overige_activa_0 * omzet_jaar / omzet_0,
+			"NWC_Normalisatie": -nwc_aanpassing,
 			"Handelsschulden": driver("dpo", jaar) / config.DAGEN_PER_JAAR * omzet_jaar * kosten_6061,
 			"Vooruitbetalingen": driver("dagen_vooruitbetaling", jaar) / config.DAGEN_PER_JAAR * omzet_jaar,
 			"Sociale_Schulden": sociale_schulden_0 * personeel_jaar / personeel_0 if personeel_0 > 0 else sociale_schulden_0,
 			"Overige_Passiva": overige_passiva_0 * omzet_jaar / omzet_0,
 		}
-		delta_twc = sum(posten[post] - posten_begin[post] for post in ("Voorraden", "Handelsvorderingen")) - sum(
+		delta_twc = sum(
+			posten[post] - posten_begin[post] for post in ("Voorraden", "Handelsvorderingen", "NWC_Normalisatie")
+		) - sum(
 			posten[post] - posten_begin[post] for post in ("Handelsschulden", "Vooruitbetalingen")
 		)
 		delta_overig = (

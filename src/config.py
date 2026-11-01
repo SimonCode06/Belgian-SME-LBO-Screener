@@ -162,6 +162,13 @@ MAX_GROEPSVORDERINGEN_PCT = 25.0 # Red flag als vorderingen op verbonden onderne
 # Schulden aan verbonden ondernemingen (9351) worden niet apart debt-like gemaakt: ze zitten al in de
 # financiële schulden (170/4, 42, 43), de handelsschulden (44) of de overige schulden (47/48, al debt-like).
 INTERCOMPANY_BEHANDELING = "cash_like"
+# NWC-peg: het normale werkkapitaal = gemiddelde TWC in % van de omzet over de beschikbare jaareinden x de
+# omzet van het laatste jaar. Ligt de TWC bij closing daarboven, dan krijgt de verkoper het verschil betaald
+# (en omgekeerd). Jaareindecijfers tonen geen seizoenspatroon: de peg is een benadering.
+# In het model betaalt de sponsor hetzelfde: het verschil met de prijs blijft als cash in het bedrijf en
+# wordt in jaar 1 gebruikt om het werkkapitaal naar het normale niveau te brengen (of komt dan vrij).
+# Zo krijgt de koper de aanpassing niet twee keer: lagere prijs én blijvend te laag werkkapitaal.
+NWC_PEG_TOEPASSEN = True
 
 # Modelcode in de CSV -> schema. Alleen codes die in echte neerleggingen zijn vastgesteld;
 # andere modellen worden herkend aan hun rubrieken (zie Neerlegging.schema).

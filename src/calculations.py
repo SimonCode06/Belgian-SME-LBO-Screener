@@ -203,7 +203,9 @@ def bouw_dataframe(resultaten):
     df["Instap_Multiple"] = [instap for instap, _ in multiples]
     df["Senior_Multiple"] = [senior for _, senior in multiples]
     df["Indicatieve_EV"] = df["Genormaliseerde_EBITDA"] * df["Instap_Multiple"]
-    df["Indicatieve_Equity_Value"] = df["Indicatieve_EV"] - df["Adjusted_Net_Debt"]
+    # NWC-peg: werkkapitaal boven het normale niveau wordt aan de verkoper betaald (en omgekeerd)
+    df["NWC_Aanpassing"] = pd.to_numeric(df["NWC_Aanpassing"]).fillna(0.0)
+    df["Indicatieve_Equity_Value"] = df["Indicatieve_EV"] - df["Adjusted_Net_Debt"] + df["NWC_Aanpassing"]
 
     # Fase 4: 3-statement LBO-model. De assumpties komen van Gemini of, zonder AI, uit de mechanische drivers.
     if "LBO_Assumpties" not in df:
@@ -453,6 +455,10 @@ def bouw_dataframe(resultaten):
         "Handelsschulden",
         "Ontvangen_Vooruitbetalingen",
         "Trade_Working_Capital",
+        "NWC_Peg_Pct",
+        "NWC_Peg",
+        "NWC_Peg_Jaren",
+        "NWC_Aanpassing",
         "Capex_Laatste_Jaar",
         "Capex_Gemiddeld",
         "Capex_Aantal_Jaren",

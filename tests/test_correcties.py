@@ -95,3 +95,46 @@ def test_minimum_cash_ignores_net_other_income(filings, monkeypatch):
 	rij = rij_van(reeks)
 	assert rij["Overige_Kosten_Cash"] == 0.0
 	assert rij["Minimum_Cash_Behoefte"] == pytest.approx(2_200_000 / 12 + 6_000_000 * config.MIN_CASH_PCT_INKOOP)
+
+
+# --- 3.3 NWC peg --------------------------------------------------------------------------
+
+
+def test_equal_twc_percentage_gives_no_adjustment(filings):
+	cijfers = bouw_cijfers(filings)
+	assert cijfers["NWC_Peg_Jaren"] == 3
+	assert cijfers["NWC_Aanpassing"] == pytest.approx(0.0, abs=1e-6)
+
+
+def met_gerekte_leveranciers(filings, extra=500_000.0):
+	"""Last year: payables 0.5m higher and cash 0.5m higher (suppliers paid late before the sale)."""
+	jaar = filings[-1]
+	codes = dict(jaar.codes)
+	for code in ("44", "42/48", "17/49", "10/49"):
+		codes[code] += extra
+	for code in ("54/58", "29/58", "20/58"):
+		codes[code] += extra
+	return filings[:-1] + [replace(jaar, codes=codes)]
+
+
+def test_stretched_payables_lower_the_price_for_the_seller_not_the_sponsor_equity(filings):
+	basis, gerekt = rij_van(filings), rij_van(met_gerekte_leveranciers(filings))
+	assert bouw_cijfers(met_gerekte_leveranciers(filings))["Check_Data"] == labels.CHECK_OK
+	aanpassing = gerekt["NWC_Aanpassing"]
+	assert aanpassing < 0
+	# Peg = average TWC % over three year-ends x last revenue
+	twc = [0.15 * omzet + 0.05 * inkoop - 0.12 * inkoop for omzet, inkoop in ((9.0e6, 5.4e6), (9.5e6, 5.7e6), (10.0e6, 6.0e6))]
+	twc[-1] -= 500_000.0
+	pct = sum(t / o for t, o in zip(twc, (9.0e6, 9.5e6, 10.0e6))) / 3
+	assert aanpassing == pytest.approx(twc[-1] - pct * 10.0e6)
+
+	assert gerekt["LBO_Sponsor_Equity_Instap"] == pytest.approx(basis["LBO_Sponsor_Equity_Instap"])
+	assert gerekt["LBO_Balanscheck"] == labels.CHECK_OK
+	jaren = gerekt["LBO_Jaren"]
+	assert jaren[0]["Cash"] == pytest.approx(gerekt["Minimum_Operationele_Cash"] - aanpassing)
+	assert jaren[1]["NWC_Normalisatie"] == pytest.approx(-aanpassing)
+
+
+def test_nwc_peg_can_be_switched_off(filings, monkeypatch):
+	monkeypatch.setattr(config, "NWC_PEG_TOEPASSEN", False)
+	assert bouw_cijfers(met_gerekte_leveranciers(filings))["NWC_Aanpassing"] == 0.0

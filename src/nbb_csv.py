@@ -512,6 +512,30 @@ def _data_volledigheid(huidig, vorig, omzet_code, aantal_jaren):
 	return labels.DATA_COMPLETE
 
 
+def _twc(jaar):
+	"""Trade working capital op de balansdatum: voorraden + handelsvorderingen - handelsschulden - vooruitbetalingen."""
+	return jaar.waarde("3") + jaar.waarde("40") - jaar.waarde("44") - jaar.waarde("46")
+
+
+def _nwc_peg(reeks, omzet_code):
+	"""Normaal werkkapitaal en de aanpassing bij closing (positief: meer voor de verkoper)."""
+	huidig = reeks[-1]
+	omzet = huidig.per_jaar(omzet_code)
+	ratios = [_twc(jaar) / jaar.per_jaar(omzet_code) for jaar in reeks if jaar.per_jaar(omzet_code) > 0]
+	ratios = [ratio for ratio in ratios if not math.isnan(ratio)]
+	twc = _twc(huidig)
+	if math.isnan(twc) or not ratios or not omzet > 0:
+		return {"NWC_Peg_Pct": NIET_BESCHIKBAAR, "NWC_Peg": NIET_BESCHIKBAAR, "NWC_Aanpassing": 0.0, "NWC_Peg_Jaren": 0}
+	peg_pct = sum(ratios) / len(ratios)
+	peg = peg_pct * omzet if config.NWC_PEG_TOEPASSEN else twc
+	return {
+		"NWC_Peg_Pct": peg_pct * 100,
+		"NWC_Peg": peg,
+		"NWC_Aanpassing": twc - peg,
+		"NWC_Peg_Jaren": len(ratios),
+	}
+
+
 def _opmaak_nummer(nummer):
 	return f"{nummer[:4]}.{nummer[4:7]}.{nummer[7:]}" if len(nummer) == 10 else nummer
 
@@ -571,6 +595,7 @@ def bouw_cijfers(neerleggingen):
 		"Memo_Schulden_Verbonden": huidig.memo("9351"),
 		**_bereken_drivers(reeks, omzet_code),
 		**_openingsposten(huidig),
+		**_nwc_peg(reeks, omzet_code),
 		"Data_Volledigheid": _data_volledigheid(huidig, vorig, omzet_code, len(reeks)),
 		"Check_Data": labels.CHECK_OK if not fouten else labels.check_review(fouten),
 		"Cijfer_Flags": "; ".join(signalen),

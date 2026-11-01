@@ -114,6 +114,7 @@ PCT_KOLOMMEN = {
 	"Driver_Capex_Pct",
 	"Driver_Kosten_60_Pct",
 	"Driver_Kosten_6061_Pct",
+	"NWC_Peg_Pct",
 	"Indicatieve_IRR_Pct",
 	"LBO_Downside_IRR_Pct",
 	"LBO_Upside_IRR_Pct",
@@ -124,7 +125,7 @@ PCT_KOLOMMEN = {
 	"LBO_EBITDA_Marge_Exit_Pct",
 }
 DAGEN_KOLOMMEN = {"Driver_DSO", "Driver_DIO", "Driver_DPO", "Driver_Dagen_Vooruitbetaling"}
-GETAL_KOLOMMEN = {"Capex_Aantal_Jaren", "Driver_Aantal_Jaren", "VTE", "LBO_Duur_Jaren", "Boekjaar_Maanden", "Boekjaar_Maanden_Vorig_Jaar"}
+GETAL_KOLOMMEN = {"NWC_Peg_Jaren", "Capex_Aantal_Jaren", "Driver_Aantal_Jaren", "VTE", "LBO_Duur_Jaren", "Boekjaar_Maanden", "Boekjaar_Maanden_Vorig_Jaar"}
 MULT_KOLOMMEN = {
 	"Instap_Multiple",
 	"Senior_Multiple",
