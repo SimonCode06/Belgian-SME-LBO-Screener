@@ -38,3 +38,24 @@ def test_risks_tab_lists_every_flag_with_a_filter_and_reads_the_ledger(cijfers, 
 	links = [cel.value for regel in ws.iter_rows() for cel in regel if isinstance(cel.value, str) and cel.value.startswith("='Inputs")]
 	assert [link.split("!")[1][0] for link in links] == ["C", "F", "G"]  # amount, switch and effect on the inputs tab
 	assert any(cel.value == "=Ledger_Total" for regel in ws.iter_rows() for cel in regel)
+
+
+def test_overview_opens_on_a_ranking_sorted_by_score(cijfers, filings, tmp_path, monkeypatch):
+	import openpyxl
+
+	from src import config, excel_export
+
+	monkeypatch.setattr(config, "OUTPUT_FOLDER", tmp_path)
+	tweede = {**cijfers, "Bedrijfsnaam": "Tweedeco", "Ondernemingsnummer": "0000.000.001"}
+	verlies = {**cijfers, "Bedrijfsnaam": "Lossco", "Ondernemingsnummer": "0000.000.002", "Bedrijfswinst_EBIT": -5_000_000.0}
+	df = bouw_dataframe([verlies, tweede, cijfers])
+	ws = openpyxl.load_workbook(excel_export.schrijf_overzicht(df)).worksheets[0]
+	assert ws.title == labels.TAB_RANKING and ws.auto_filter.ref.startswith("A4:")
+	namen = [ws.cell(row=r, column=2).value for r in range(5, 8)]
+	scores = [ws.cell(row=r, column=4).value for r in range(5, 8)]
+	numeriek = [score for score in scores if isinstance(score, (int, float))]
+	assert numeriek == sorted(numeriek, reverse=True) and namen[-1] == "Lossco"  # no score: last
+	status = ws.cell(row=5, column=3)
+	kleuren = {achtergrond for achtergrond, _ in labels.STATUS_COLOURS.values()}
+	assert status.fill.fgColor.rgb[-6:] in kleuren
+	assert ws.cell(row=5, column=9).number_format == stijl.FMT_MULT

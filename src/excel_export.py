@@ -9,6 +9,7 @@ from datetime import datetime
 
 import pandas as pd
 from openpyxl import Workbook
+from openpyxl.formatting.rule import DataBarRule
 from openpyxl.styles import Alignment
 from openpyxl.utils import get_column_letter
 
@@ -207,7 +208,7 @@ def _schrijf_overzichtcel(ws, rij_nr, kolom_nr, kol_naam, rij, numeriek):
 		cel.alignment = Alignment(horizontal="left", vertical="center")
 
 
-def _voetblok(ws, rij_nr, df):
+def _voetblok(ws, rij_nr, df, kolom=1):
 	"""Date, model version, Gemini model and source file."""
 	modellen = sorted({str(model) for model in df["Gebruikt_Model"] if model and model != "-"})
 	bestanden = sorted({str(bestand) for bestand in df["Bronbestand"]})
@@ -219,8 +220,8 @@ def _voetblok(ws, rij_nr, df):
 		(labels.FOOTER_RUN, str(df["Run_Manifest"].iloc[0]) if "Run_Manifest" in df else "-"),
 	]
 	for verschuiving, (label, waarde) in enumerate(regels):
-		ws.cell(row=rij_nr + verschuiving, column=1, value=label).font = stijl.lettertype(vet=True)
-		ws.cell(row=rij_nr + verschuiving, column=2, value=waarde).font = stijl.lettertype()
+		ws.cell(row=rij_nr + verschuiving, column=kolom, value=label).font = stijl.lettertype(vet=True)
+		ws.cell(row=rij_nr + verschuiving, column=kolom + 1, value=waarde).font = stijl.lettertype()
 
 
 def _vul_executive_summary(ws, df):
@@ -274,14 +275,120 @@ def _vul_detail_tabblad(ws, df):
 			_schrijf_overzichtcel(ws, rij_nr, index, kol_naam, rij, pd.api.types.is_numeric_dtype(df[kol_naam]))
 
 
+def _scenario_irr(rij, scenario):
+	model = (rij.get("LBO_Scenarios") or {}).get(scenario) or {}
+	waarde = _leeg_als_nan(model.get("LBO_IRR_Exact_Pct"))
+	return None if waarde is None else waarde / 100
+
+
+def _getal(rij, veld, deler=1):
+	waarde = _leeg_als_nan(rij.get(veld))
+	try:
+		return None if waarde is None else float(waarde) / deler
+	except (TypeError, ValueError):
+		return None
+
+
+def _ranking_regels(df):
+	"""One line per company, the highest score first (no score last)."""
+	regels = []
+	for _, rij in df.iterrows():
+		vlaggen = rij.get("Red_Flag_Lijst") or []
+		eerste = vlaggen[0] if vlaggen else None
+		status = str(rij.get("LBO_Status") or "")
+		regels.append({
+			"company": rij.get("Bedrijfsnaam"),
+			"status": status.split(" (")[0],
+			"status_full": status,
+			"score": _getal(rij, "Score"),
+			"robustness": _getal(rij, "Robuustheid_Pct", 100),
+			"deal": rij.get("Dealtype") or "-",
+			"ebitda": _getal(rij, "Genormaliseerde_EBITDA"),
+			"margin": _getal(rij, "Driver_EBITDA_Marge_Pct", 100),
+			"dc": _getal(rij, "Debt_Capacity_Multiple"),
+			"atp": _getal(rij, "ATP_Max_Entry_Multiple"),
+			"entry": _getal(rij, "Instap_Multiple"),
+			"headroom": _getal(rij, "ATP_Headroom_Pct", 100),
+			"irr_screening": _scenario_irr(rij, "screening_base"),
+			"irr_ai": _scenario_irr(rij, "base"),
+			"flag": f"[{labels.SEVERITIES.get(eerste['ernst'], eerste['ernst'])}] {eerste['tekst']}" if eerste else "-",
+		})
+	return sorted(regels, key=lambda regel: (_rang(regel["status_full"]), regel["score"] is None, -(regel["score"] or 0)))
+
+
+RANG_VOLGORDE = (
+	labels.STATUS_STRONG, labels.STATUS_POSSIBLE, labels.STATUS_WEAK, labels.STATUS_REVIEW, labels.STATUS_INSUFFICIENT,
+	labels.STATUS_NO_GO,
+)
+
+
+def _rang(status):
+	"""The label decides first (a NO-GO never ranks above a candidate), the score within a label."""
+	return next((index for index, label in enumerate(RANG_VOLGORDE) if status.startswith(label)), len(RANG_VOLGORDE))
+
+
+RANKING_KOLOMMEN = [
+	("rank", "0", 6), ("company", None, 28), ("status", None, 22), ("score", "0.0", 9), ("robustness", stijl.FMT_PCT, 11),
+	("deal", None, 11), ("ebitda", stijl.FMT_BEDRAG, 12), ("margin", stijl.FMT_PCT, 10), ("entry", stijl.FMT_MULT, 9),
+	("dc", stijl.FMT_MULT, 10), ("atp", stijl.FMT_MULT, 10), ("headroom", stijl.FMT_PCT, 10),
+	("irr_screening", stijl.FMT_PCT, 11), ("irr_ai", stijl.FMT_PCT, 11), ("flag", None, 70),
+]
+
+
+def _vul_ranking(ws, df):
+	"""The first tab: every company ranked by screening score, with a filter and the label in colour."""
+	ws.sheet_view.showGridLines = False
+	laatste = len(RANKING_KOLOMMEN)
+	for kolom in range(1, laatste + 1):
+		stijl.sectiekop(ws.cell(row=1, column=kolom))
+	ws.cell(row=1, column=1, value=f"{labels.TITLE_RANKING}   ({labels.UNITS_NOTE})")
+	ws.cell(row=2, column=1, value=labels.RANKING_NOTE).font = stijl.lettertype(cursief=True, grootte=8)
+	for kolom, (sleutel, _, breedte) in enumerate(RANKING_KOLOMMEN, start=1):
+		cel = ws.cell(row=4, column=kolom, value=labels.RANKING_HEADERS[sleutel])
+		cel.font = stijl.lettertype(vet=True)
+		cel.fill = stijl.VUL_ACTUAL
+		cel.border = stijl.RAND_SUBTOTAAL
+		cel.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+		ws.column_dimensions[get_column_letter(kolom)].width = breedte
+	ws.row_dimensions[4].height = 42
+	regels = _ranking_regels(df)
+	for plaats, regel in enumerate(regels, start=1):
+		nr = 4 + plaats
+		regel["rank"] = plaats
+		for kolom, (sleutel, fmt, _) in enumerate(RANKING_KOLOMMEN, start=1):
+			cel = ws.cell(row=nr, column=kolom, value=regel[sleutel] if regel[sleutel] is not None else "-")
+			cel.font = stijl.lettertype(stijl.BLAUW if fmt and sleutel != "rank" else stijl.ZWART, grootte=9)
+			cel.alignment = Alignment(
+				horizontal="left" if sleutel in ("company", "flag") else "center", vertical="center", wrap_text=sleutel == "flag"
+			)
+			if fmt:
+				cel.number_format = fmt
+			cel.border = stijl.Border(bottom=stijl.DUN_GRIJS)
+		stijl.status_kleur(ws.cell(row=nr, column=3), regel["status_full"])
+		ws.cell(row=nr, column=3).font = stijl.lettertype(ws.cell(row=nr, column=3).font.color.rgb[-6:], vet=True, grootte=9)
+		ws.row_dimensions[nr].height = 30
+	einde = 4 + max(len(regels), 1)
+	ws.auto_filter.ref = f"A4:{get_column_letter(laatste)}{einde}"
+	if regels:
+		ws.conditional_formatting.add(
+			f"D5:D{einde}",
+			DataBarRule(start_type="num", start_value=0, end_type="num", end_value=100, color="5B9BD5", showValue=True),
+		)
+	ws.freeze_panes = "C5"
+	stijl.afdruk(ws, labels.TITLE_RANKING, titelrijen="1:4", titelkolommen="A:B")
+	_voetblok(ws, einde + 2, df, kolom=2)
+
+
 def schrijf_overzicht(df):
-	"""Writes the comparison workbook: Executive Summary + Full Data Detail."""
+	"""Writes the comparison workbook: Ranking + Executive Summary + Full Data Detail."""
 	tijdstempel = datetime.now().strftime("%Y%m%d_%H%M")
 	pad = config.OUTPUT_FOLDER / f"{labels.OVERVIEW_FILE}_{tijdstempel}.xlsx"
 
 	wb = Workbook()
-	ws_exec = wb.active
-	ws_exec.title = labels.TAB_OVERVIEW
+	ws_rank = wb.active
+	ws_rank.title = labels.TAB_RANKING
+	_vul_ranking(ws_rank, df)
+	ws_exec = wb.create_sheet(title=labels.TAB_OVERVIEW)
 	_vul_executive_summary(ws_exec, df)
 
 	ws_detail = wb.create_sheet(title=labels.TAB_DETAIL)
@@ -294,7 +401,7 @@ def schrijf_overzicht(df):
 # 2. Company workbooks: the live model per company
 # ============================================================================
 def schrijf_per_bedrijf(df, meerjaren):
-	"""Writes one workbook per company (Executive Summary, 3-Statement Model, LBO Analysis). Returns the paths."""
+	"""Writes one workbook per company (summary, inputs, model, LBO, sensitivities, risks). Returns the paths."""
 	tijdstempel = datetime.now().strftime("%Y%m%d_%H%M")
 	gebruikte_namen = set()
 	paden = []

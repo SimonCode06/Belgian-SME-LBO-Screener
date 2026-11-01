@@ -349,6 +349,15 @@ COMPANY_FILE = "LBO_Model"
 UNKNOWN_COMPANY = "Unknown_Company"
 
 TAB_OVERVIEW = "Executive Summary"
+TAB_RANKING = "Ranking"
+TITLE_RANKING = "LBO SCREENING RANKING"
+RANKING_NOTE = "Ranked by assessment, then by screening score (filing and screening case). IRR AI Base is information only. Filter and sort with the arrows."
+RANKING_HEADERS = {
+	"rank": "#", "company": "Company", "status": "Assessment", "score": "Score", "robustness": "Robustness", "deal": "Deal Type",
+	"ebitda": "Adj. EBITDA", "margin": "EBITDA Margin", "entry": "Entry Multiple", "dc": "Debt Capacity",
+	"atp": "Max Entry @ Target IRR", "headroom": "Price Headroom", "irr_screening": "IRR Screening Base",
+	"irr_ai": "IRR AI Base", "flag": "Most Severe Flag",
+}
 TAB_SUMMARY = "Executive Summary"
 TAB_INPUTS = "Inputs & Assumptions"
 TAB_MODEL = "3-Statement Model"
