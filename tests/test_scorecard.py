@@ -57,6 +57,7 @@ def test_score_and_robustness_do_not_move_with_a_new_ai_snapshot(cijfers, filing
 	assert a["LBO_IRR_Exact_Pct"] != b["LBO_IRR_Exact_Pct"]  # the analyst case does move
 	assert a["Score"] == pytest.approx(b["Score"])
 	assert a["Robuustheid_Pct"] == b["Robuustheid_Pct"]
+	assert a["LBO_Status"] == b["LBO_Status"]  # no label tilts on a new AI snapshot alone
 
 
 def test_robustness_grid_has_18_runs_and_the_pass_rule(rij):

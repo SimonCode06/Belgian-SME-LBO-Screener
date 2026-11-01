@@ -269,7 +269,44 @@ def lees_argumenten(argv=None):
 		action="store_true",
 		help="Laat Gemini nieuwe assumpties maken; de bestaande snapshots in assumpties/ worden gearchiveerd.",
 	)
+	parser.add_argument(
+		"--ijking",
+		action="store_true",
+		help="Schrijf ook output/ijking_<tijdstempel>.csv: de rangorde op score met alle componenten (stap 5.6).",
+	)
 	return parser.parse_args(argv)
+
+
+def schrijf_ijking(df, run_naam):
+	"""The ranking by score with every component, to compare with your own judgement as an analyst."""
+	rijen = []
+	for _, rij in df.sort_values("Score", ascending=False).iterrows():
+		regel = {
+			"Company": rij["Bedrijfsnaam"],
+			"Status": rij["LBO_Status"],
+			"Score": round(float(rij["Score"]), 1),
+			"Robustness %": round(float(rij["Robuustheid_Pct"]), 1),
+			"Deal type": rij["Dealtype"],
+			"Adjusted EBITDA": round(float(rij["Genormaliseerde_EBITDA"])) if pd.notna(rij["Genormaliseerde_EBITDA"]) else None,
+			"Debt capacity x": rij["Debt_Capacity_Multiple"],
+			"Binding": rij["Debt_Capacity_Bindend"],
+			"Max entry x": rij["ATP_Max_Entry_Multiple"],
+			"Headroom %": rij["ATP_Headroom_Pct"],
+			"High flags": rij["Aantal_Hoge_Vlaggen"],
+			"Medium flags": rij["Aantal_Middel_Vlaggen"],
+			"Analyst case": rij["Analyst_Case"],
+		}
+		for component in rij["Score_Componenten"]:
+			regel[component["label"]] = round(component["score"], 1)
+			regel[f"{component['label']}: reason"] = component["reden"]
+		rijen.append(regel)
+	config.OUTPUT_FOLDER.mkdir(exist_ok=True)
+	pad = config.OUTPUT_FOLDER / run_naam.replace("run_", "ijking_").replace(".json", ".csv")
+	pd.DataFrame(rijen).to_csv(pad, index=False, sep=";", encoding="utf-8-sig", decimal=",")
+	print("\nRangorde op score (ijking):")
+	for regel in rijen:
+		print(f"   {regel['Score']:5.1f}  {regel['Company']:<30} {regel['Status']}")
+	return pad
 
 
 def main(argv=None):
@@ -395,6 +432,8 @@ def main(argv=None):
 			run_naam, df, invoer_per_bedrijf, vars(argumenten), [overzicht_pad, *per_bedrijf_paden], mislukt
 		)
 		print(f"Run-manifest: {schrijf_manifest(manifest)}")
+		if argumenten.ijking:
+			print(f"IJking opgeslagen als: {schrijf_ijking(df, run_naam)}")
 	else:
 		print("\nEr konden geen resultaten worden verwerkt.")
 

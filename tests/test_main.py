@@ -186,6 +186,7 @@ def test_broken_snapshot_is_reported_not_overwritten(pdf, filings, cijfers):
 def test_command_line_flag():
 	assert app.lees_argumenten([]).vernieuw_assumpties is False
 	assert app.lees_argumenten(["--vernieuw-assumpties"]).vernieuw_assumpties is True
+	assert app.lees_argumenten(["--ijking"]).ijking is True
 
 
 # --- End to end: CSV in, Excel and run manifest out ----------------------------------------
@@ -265,3 +266,14 @@ def test_company_workbook_shows_the_screening_scenarios_and_snapshot(mappen, fil
 		assert assumpties.scenario_label(scenario) in keuzelijst
 	samenvatting = {cel.value for rij in wb[labels.TAB_SUMMARY].iter_rows() for cel in rij}
 	assert labels.SNAPSHOT_LABEL in samenvatting and labels.SNAPSHOT_STATUS in samenvatting
+
+
+def test_calibration_file_ranks_by_score(mappen):
+	import pandas as pd
+
+	app.main(["--ijking"])
+	pad = next(config.OUTPUT_FOLDER.glob("ijking_*.csv"))
+	tabel = pd.read_csv(pad, sep=";", decimal=",")
+	assert list(tabel["Score"]) == sorted(tabel["Score"], reverse=True)
+	for kolom in ("Status", "Debt capacity x", "Max entry x", "Debt Capacity", "Debt Capacity: reason", "Data Quality"):
+		assert kolom in tabel.columns, kolom
