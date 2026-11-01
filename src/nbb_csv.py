@@ -419,10 +419,14 @@ def _balansregels(neerlegging):
 	overige_passiva = (
 		neerlegging.waarde("10/49") - neerlegging.waarde("10/15", "170/4", "42", "43", "44", "46") - debt_like
 	)
-	# Groepsvorderingen en vorderingen op bestuurders in de overige vorderingen (41) zijn geen werkkapitaal.
-	# Eerst de groepsvorderingen, dan die op bestuurders, samen nooit meer dan 41 en de overige activa.
-	ruimte = min(neerlegging.bedrag("41"), max(overige_activa, 0.0))
-	intercompany = min(_of_nul(neerlegging.memo("9291")), ruimte)
+	# Groepsvorderingen en vorderingen op bestuurders zijn geen werkkapitaal: de groepsvorderingen op meer dan
+	# een jaar (9301) in de overige vorderingen > 1 jaar (291), en die op ten hoogste een jaar in 41. Eerst de
+	# groep, dan de bestuurders, samen nooit meer dan die posten en de overige activa.
+	beschikbaar = max(overige_activa, 0.0)
+	groep = _of_nul(neerlegging.memo("9291"))
+	lang = min(_of_nul(neerlegging.memo("9301")), neerlegging.bedrag("291"), groep, beschikbaar)
+	ruimte = min(neerlegging.bedrag("41"), beschikbaar - lang)
+	intercompany = lang + min(groep - lang, ruimte)
 	bestuurders = min(_of_nul(neerlegging.memo("9500")), ruimte - intercompany)
 	behandeling = config.INTERCOMPANY_BEHANDELING
 	niet_operationeel = bestuurders + (0.0 if behandeling == "operationeel" else intercompany)
@@ -432,7 +436,8 @@ def _balansregels(neerlegging):
 	return {
 		"overige_activa": overige_activa,
 		"niet_operationeel": niet_operationeel,
-		# Alleen bij cash_like: vereffend vóór closing, dus uit de openingsbalans en in de bridge
+		# Alleen bij cash_like: vereffend vóór closing (net als de groepsschulden), dus uit de openingsbalans
+		# en als aftrek in de bridge
 		"intercompany_cash_like": intercompany if behandeling == "cash_like" else 0.0,
 		"overige_passiva": overige_passiva,
 		"sociaal": sociaal,
@@ -636,6 +641,7 @@ def bouw_cijfers(neerleggingen):
 		"Memo_Vorderingen_Bestuurders": huidig.memo("9500"),
 		"Memo_Vorderingen_Verbonden": huidig.memo("9291"),
 		"Memo_Schulden_Verbonden": huidig.memo("9351"),
+		"Deelnemingen_Verbonden": huidig.bedrag("280"),
 		**_bereken_drivers(reeks, omzet_code),
 		**_openingsposten(huidig),
 		**_nwc_peg(reeks, omzet_code),

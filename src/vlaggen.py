@@ -68,6 +68,9 @@ def model_vlaggen(rij):
 	groep = _getal(rij, "Memo_Vorderingen_Verbonden")
 	if balans > 0 and groep / balans * 100 > config.MAX_GROEPSVORDERINGEN_PCT:
 		voeg("groepsvorderingen", "verbonden_partijen", labels.FLAG_GROUP_RECEIVABLES.format(value=groep, pct=groep / balans * 100))
+	deelnemingen = _getal(rij, "Deelnemingen_Verbonden")
+	if balans > 0 and deelnemingen / balans * 100 > config.MAX_DEELNEMINGEN_PCT:
+		voeg("deelnemingen", "financieel", labels.FLAG_PARTICIPATIONS.format(value=deelnemingen, pct=deelnemingen / balans * 100))
 	if _getal(rij, "Memo_Zekerheden_Derden") > max(_getal(rij, "Genormaliseerde_EBITDA"), 0):
 		voeg("zekerheden_derden", "financieel", labels.FLAG_THIRD_PARTY_GUARANTEES.format(value=rij["Memo_Zekerheden_Derden"]))
 	if _getal(rij, "Trade_Working_Capital") < 0:

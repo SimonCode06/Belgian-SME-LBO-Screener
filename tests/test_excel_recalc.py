@@ -375,3 +375,15 @@ def test_live_covenant_cell_agrees_with_the_debt_capacity(excel, tmp_path, rij, 
 			assert open_wb.cel("lbo", "dc_live") == verwacht, multiple
 	finally:
 		open_wb.sluit()
+
+
+def test_unitranche_structure_reconciles(excel, tmp_path, rij, filings, monkeypatch):
+	monkeypatch.setattr(config, "LBO_SENIOR_MARKT", [(float("inf"), "Unitranche", 0.01, 0.08)])
+	pack, cijfers = rij
+	df_rij, pad, kaart = bouw(tmp_path, cijfers, pack, filings)
+	open_wb = Open(excel, pad, kaart)
+	try:
+		for scenario in ("base", "screening_stress"):
+			vergelijk_scenario(open_wb, df_rij, scenario)
+	finally:
+		open_wb.sluit()

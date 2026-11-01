@@ -13,7 +13,7 @@ naar de equity value voor de verkoper en naar de bediening van de nieuwe schuld.
 import pandas as pd
 
 from . import assumpties, config, labels, normalisaties, scorecard, structurering, vlaggen
-from .lbo_model import bereken_scenarios, kies_multiples, net_debt
+from .lbo_model import bereken_scenarios, kies_multiples, net_debt, senior_markt
 
 NIET_BESCHIKBAAR = float("nan")  # verschijnt als lege cel in Excel, niet als 0%
 
@@ -244,6 +244,11 @@ def bouw_dataframe(resultaten):
     multiples = df["Genormaliseerde_EBITDA"].apply(kies_multiples)
     df["Instap_Multiple"] = [instap for instap, _ in multiples]
     df["Senior_Multiple"] = [senior for _, senior in multiples]
+    # The senior financing follows the market for the deal size (config.LBO_SENIOR_MARKT)
+    markt = [senior_markt(ebitda) for ebitda in df["Genormaliseerde_EBITDA"]]
+    df["Senior_Type"] = [naam for naam, _, _ in markt]
+    df["Senior_Aflossing_Pct"] = [aflossing * 100 for _, aflossing, _ in markt]
+    df["Senior_Rente_Pct"] = [rente * 100 for _, _, rente in markt]
     df["Indicatieve_EV"] = df["Genormaliseerde_EBITDA"] * df["Instap_Multiple"]
     # NWC-peg: werkkapitaal boven het normale niveau wordt aan de verkoper betaald (en omgekeerd)
     df["NWC_Aanpassing"] = pd.to_numeric(df["NWC_Aanpassing"]).fillna(0.0)
@@ -449,6 +454,7 @@ def bouw_dataframe(resultaten):
         "Memo_Vorderingen_Bestuurders",
         "Memo_Vorderingen_Verbonden",
         "Memo_Schulden_Verbonden",
+        "Deelnemingen_Verbonden",
         "Voorraden",
         "Handelsvorderingen",
         "Handelsschulden",
@@ -488,6 +494,9 @@ def bouw_dataframe(resultaten):
         "Open_Overige_Passiva",
         "Instap_Multiple",
         "Senior_Multiple",
+        "Senior_Type",
+        "Senior_Aflossing_Pct",
+        "Senior_Rente_Pct",
         "Indicatieve_EV",
         "Indicatieve_Equity_Value",
         "LBO_Instap_EV",

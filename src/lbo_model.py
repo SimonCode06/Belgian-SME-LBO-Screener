@@ -83,6 +83,17 @@ class Structuur:
 	exit_multiple: float
 	senior_multiple: float
 	vendor_pct: float
+	senior_aflossing: float = None  # verplichte aflossing per jaar, deel van het startbedrag; None = marktband
+	senior_rente: float = None      # None = marktband
+
+
+def senior_markt(ebitda):
+	"""(naam, jaarlijkse aflossing, rente) van de senior financiering voor deze dealgrootte."""
+	for tot, naam, aflossing, rente in config.LBO_SENIOR_MARKT:
+		if ebitda < tot:
+			return naam, aflossing, rente
+	_, naam, aflossing, rente = config.LBO_SENIOR_MARKT[-1]
+	return naam, aflossing, rente
 
 
 def standaard_structuur(ebitda):
@@ -344,6 +355,9 @@ def bereken_lbo(rij, scenario="base", structuur=None):
 	# 1. Bronnen en bestedingen
 	structuur = structuur or standaard_structuur(ebitda_0)
 	instap_multiple, senior_multiple = structuur.entry_multiple, structuur.senior_multiple
+	_, markt_aflossing, markt_rente = senior_markt(ebitda_0)
+	senior_aflossing = markt_aflossing if structuur.senior_aflossing is None else structuur.senior_aflossing
+	senior_rente = markt_rente if structuur.senior_rente is None else structuur.senior_rente
 	instap_ev = ebitda_0 * instap_multiple
 	transactiekosten = instap_ev * config.LBO_TRANSACTIEKOSTEN_PCT
 	financieringskosten = instap_ev * config.LBO_FINANCIERINGSKOSTEN_PCT
@@ -513,7 +527,7 @@ def bereken_lbo(rij, scenario="base", structuur=None):
 			saldo_rcf = (rcf + rcf_eind) / 2 if gemiddeld else rcf
 			saldo_cash = (cash + cash_eind) / 2 if gemiddeld else cash
 
-			rente_senior = saldo_senior * config.LBO_SENIOR_RENTE * fractie
+			rente_senior = saldo_senior * senior_rente * fractie
 			rente_rcf = saldo_rcf * config.LBO_RCF_RENTE * fractie
 			commitment_fee = (rcf_limiet - saldo_rcf) * config.LBO_RCF_COMMITMENT_FEE * fractie
 			rente_vendor = vendor * config.LBO_VENDOR_LOAN_RENTE * fractie
@@ -532,7 +546,7 @@ def bereken_lbo(rij, scenario="base", structuur=None):
 			# PIK: de rente op de vendor loan wordt gekapitaliseerd en verlaat de waterval niet
 			pik = rente_vendor if config.LBO_VENDOR_LOAN_PIK else 0.0
 			fcf = ebitda - belasting - capex - delta_twc - delta_overig - (rente - pik) + rente_opbrengst
-			verplichte_aflossing = min(senior, senior_0 / config.LBO_SENIOR_LOOPTIJD_JAAR * fractie)
+			verplichte_aflossing = min(senior, senior_0 * senior_aflossing * fractie)
 			excess_cash_flow = fcf - verplichte_aflossing
 
 			# Waterval: tekort op de minimum cash naar de RCF, overschot eerst naar de RCF en dan naar de sweep

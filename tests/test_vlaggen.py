@@ -75,3 +75,9 @@ def test_deal_type_from_ownership(cijfers, soort, verwacht):
 
 def test_no_text_pass_gives_unknown(cijfers):
 	assert bouw_dataframe([cijfers]).iloc[0]["Dealtype"] == labels.DEAL_UNKNOWN
+
+
+
+def test_large_participations_point_to_the_consolidated_accounts(cijfers):
+	rij = bouw_dataframe([{**cijfers, "Deelnemingen_Verbonden": 0.5 * cijfers["Balanstotaal"]}]).iloc[0]
+	assert any(vlag["sleutel"] == "deelnemingen" and vlag["ernst"] == "middel" for vlag in rij["Red_Flag_Lijst"])

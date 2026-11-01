@@ -85,8 +85,18 @@ ROBUUST_MULTIPLE = (-0.5, 0.0, 0.5)
 ROBUUST_SENIOR_KORTING = (0.0, 0.5)
 
 # Financiering
-LBO_SENIOR_RENTE = 0.065         # Rente op de amortiserende senior lening (6,5% p.j.)
-LBO_SENIOR_LOOPTIJD_JAAR = 7     # Lineaire aflossing van de senior lening
+LBO_SENIOR_RENTE = 0.065         # Standaardrente senior (de marktband hieronder bepaalt de rente per deal)
+LBO_SENIOR_LOOPTIJD_JAAR = 7     # Looptijd van de senior: afschrijving van de financieringskosten
+# De senior financiering volgt de markt voor de dealgrootte, zoals een PE-analist ze structureert:
+# - kleine KMO-deals: Belgische bankfinanciering, lineair afgelost over 7 jaar
+# - mid-market: Term Loan A (50%, lineair over 6 jaar) + Term Loan B (50%, 1% per jaar, rest bij exit)
+# - groter: unitranche van een direct lender, 1% aflossing per jaar, rest bij exit, met een hogere rente
+# (EBITDA tot, naam, jaarlijkse verplichte aflossing als deel van het startbedrag, rente)
+LBO_SENIOR_MARKT = [
+	(3_000_000, "Bank Senior (Amortising, 7 Years)", 1 / 7, 0.065),
+	(7_500_000, "TLA (50%, 6 Years) + TLB (50%, Bullet)", 0.5 / 6 + 0.5 * 0.01, 0.070),
+	(float("inf"), "Unitranche (1% p.a., Bullet)", 0.01, 0.080),
+]
 LBO_CASH_SWEEP_PCT = 0.50        # Deel van de excess cash flow van het jaar dat extra aflost op de senior lening
 LBO_VENDOR_LOAN_PCT_EV = 0.10    # Vendor loan als deel van de EV, in één keer terugbetaald bij exit
 LBO_VENDOR_LOAN_RENTE = 0.08     # Rente op de vendor loan
@@ -215,6 +225,7 @@ CSV_TOLERANTIE_EUR = 5           # Toegestaan afrondingsverschil bij het nareken
 MIN_CASH_MAANDEN_OPEX = 1        # Maanden personeelskosten en overige bedrijfskosten
 MIN_CASH_PCT_INKOOP = 0.01       # Deel van de jaarlijkse inkoop (60/61)
 MAX_GROEPSVORDERINGEN_PCT = 25.0 # Red flag als vorderingen op verbonden ondernemingen dit % van de balans overschrijden
+MAX_DEELNEMINGEN_PCT = 25.0      # Red flag als deelnemingen in verbonden ondernemingen (280) dit % van de balans overschrijden
 # Vaste ernst per modelvlag (vlaggen.py): hoog / middel / laag. AI-vlaggen hebben hun ernst uit de tekstpass.
 # Een hoge vlag sluit 'STRONG' uit en kost 40 punten in de governance-score, een middelzware 15.
 FLAG_ERNST = {
@@ -224,6 +235,7 @@ FLAG_ERNST = {
 	"overgedragen_verlies": "middel",
 	"vordering_bestuurders": "middel",
 	"groepsvorderingen": "middel",
+	"deelnemingen": "middel",
 	"zekerheden_derden": "middel",
 	"ebitda_trend": "middel",
 	"margedaling": "middel",
@@ -240,7 +252,9 @@ FLAG_ERNST = {
 	"data_signaal": "laag",
 	"ai_assumptie": "laag",
 }
-# Groepsvorderingen (9291) die in de overige vorderingen (41) zitten, bv. een cash pool:
+# Groepsvorderingen (9291) in de overige vorderingen: op ten hoogste een jaar in 41 (bv. een cash pool) en op
+# meer dan een jaar (9301) in 291. Bij closing worden alle intercompany-saldi vereffend: de schulden aan de
+# groep zitten al in de financiële of overige schulden, de vorderingen zijn dan cash voor de verkoper.
 # - "cash_like": vereffend vóór closing. De verkoper krijgt ze betaald (aftrek in de Adjusted Net Debt) en ze
 #   verdwijnen uit de openingsbalans. Zo werkt een cash pool bij een carve-out.
 # - "operationeel": ze blijven in de overige operationele activa en groeien mee met de omzet.

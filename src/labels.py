@@ -144,6 +144,10 @@ FLAG_ACCUMULATED_LOSS = "Accumulated loss carried forward (EUR {value:,.0f})"
 FLAG_AUDITOR = "Statutory Auditor Opinion: {opinion}"
 FLAG_LIQUIDATION = "Company in liquidation"
 FLAG_DIRECTOR_RECEIVABLE = "Receivable from directors (EUR {value:,.0f}): leakage, to be repaid at closing"
+FLAG_PARTICIPATIONS = (
+	"Participations in affiliated companies EUR {value:,.0f} ({pct:.0f}% of total assets): the statutory accounts "
+	"do not show the subsidiaries' results; analyse the consolidated accounts"
+)
 FLAG_GROUP_RECEIVABLES = "Receivables from affiliated companies (EUR {value:,.0f}, {pct:.0f}% of total assets)"
 FLAG_EBITDA_TREND = (
 	"Historical EBITDA declines ({cagr:+.1f}% p.a.) while the forecast grows ({growth:+.1f}%): return may be overstated"
@@ -613,7 +617,8 @@ INPUT_LABELS = {
 	"Entry_Multiple": "Entry Multiple (EV / EBITDA)",
 	"Exit_Multiple": "Exit Multiple (EV / EBITDA)",
 	"Senior_Multiple": "Senior Term Loan (x EBITDA)",
-	"Senior_Rate": "Senior Term Loan Interest Rate",
+	"Senior_Rate": "Senior Interest Rate (Market for Deal Size)",
+	"Senior_Amortisation": "Senior Scheduled Amortisation p.a. (% of Initial; Rest at Exit)",
 	"Senior_Tenor": "Senior Term Loan Tenor (Years)",
 	"Cash_Sweep_Pct": "Cash Sweep (% of ECF)",
 	"Vendor_Pct_EV": "Vendor Loan (% of EV)",
@@ -724,6 +729,7 @@ COLUMN_LABELS = {
 	"Memo_Vorderingen_Bestuurders": "Memo: Receivables from Directors",
 	"Memo_Vorderingen_Verbonden": "Memo: Receivables from Affiliates",
 	"Memo_Schulden_Verbonden": "Memo: Payables to Affiliates",
+	"Deelnemingen_Verbonden": "Participations in Affiliated Companies (280)",
 	"Intercompany_Cash_Like": "Intercompany Receivables (Settled Pre-Closing)",
 	"Overige_Kosten_Cash": "Other Operating Costs (Cash, for Minimum Cash)",
 	"NWC_Peg_Pct": "NWC Peg (% of Revenue)",
@@ -829,6 +835,9 @@ COLUMN_LABELS = {
 	"Run_Manifest": "Run Manifest",
 	"Aantal_Hoge_Vlaggen": "Red Flags: High (Counted)",
 	"Dealtype": "Deal Type",
+	"Senior_Type": "Senior Financing (Market for Deal Size)",
+	"Senior_Aflossing_Pct": "Senior: Scheduled Amortisation p.a. (% of Initial)",
+	"Senior_Rente_Pct": "Senior: Interest Rate",
 	"Score": "Screening Score (0-100)",
 	"Analyst_Case": "Analyst Case (AI, Information)",
 	"Score_Toelichting": "Score: Components and Reasons",

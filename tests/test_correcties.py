@@ -369,3 +369,15 @@ def test_another_structure_still_reconciles(cijfers):
 	assert model["LBO_Vendor_Loan"] == 0.0
 	assert model["LBO_Exit_EV_Jaar5"] == pytest.approx(5.0 * model["LBO_EBITDA_Jaar5"])
 	assert model["LBO_Balanscheck"] == labels.CHECK_OK
+
+
+
+def test_long_term_group_receivable_is_cash_like_too(filings):
+	"""9301 in the other long-term receivables (291) is settled at closing, like the part in 41."""
+	reeks = filings[:-1] + [
+		met_extra_actief(filings[-1], ("29", "291"), 2_000_000.0, **{"9291": 2_500_000.0, "9301": 2_000_000.0})
+	]
+	reeks[-1] = met_extra_actief(reeks[-1], ("41", "40/41"), 500_000.0)
+	cijfers = bouw_cijfers(reeks)
+	assert cijfers["Check_Data"] == labels.CHECK_OK
+	assert cijfers["Open_Intercompany_Cash_Like"] == pytest.approx(2_500_000.0)

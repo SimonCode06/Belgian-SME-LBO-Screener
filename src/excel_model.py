@@ -423,7 +423,7 @@ def _rijen_lbo():
 		Rij("d_senior_open", jaar=lambda c: f"={c.p('d_senior')}"),
 		Rij(
 			"d_mand",
-			jaar=lambda c: f"=MIN({c.h('d_senior_open')},{c.z('d_senior')}/Senior_Tenor*{c.x('fractie')})",
+			jaar=lambda c: f"=MIN({c.h('d_senior_open')},{c.z('d_senior')}*Senior_Amortisation*{c.x('fractie')})",
 		),
 		Rij("d_sweep", jaar=lambda c: f"={c.h('w_sweep')}"),
 		Rij(
@@ -601,7 +601,8 @@ def _invoer(rij):
 		("Entry_Multiple", float(rij["Instap_Multiple"]), stijl.FMT_MULT),
 		("Exit_Multiple", float(rij["Instap_Multiple"]), stijl.FMT_MULT),
 		("Senior_Multiple", float(rij["Senior_Multiple"]), stijl.FMT_MULT),
-		("Senior_Rate", config.LBO_SENIOR_RENTE, stijl.FMT_PCT),
+		("Senior_Rate", float(rij["Senior_Rente_Pct"]) / 100, stijl.FMT_PCT),
+		("Senior_Amortisation", float(rij["Senior_Aflossing_Pct"]) / 100, stijl.FMT_PCT),
 		("Senior_Tenor", config.LBO_SENIOR_LOOPTIJD_JAAR, stijl.FMT_GETAL),
 		("Cash_Sweep_Pct", config.LBO_CASH_SWEEP_PCT, stijl.FMT_PCT),
 		("Vendor_Pct_EV", config.LBO_VENDOR_LOAN_PCT_EV, stijl.FMT_PCT),

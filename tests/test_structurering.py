@@ -113,3 +113,38 @@ def test_workbook_block_and_live_cell(rij, filings):
 	assert ws[f"C{rl['dc_binding']}"].value == rij["Debt_Capacity_Bindend"]
 	live = ws[f"C{rl['dc_live']}"].value
 	assert live.startswith('=IF(Scenario="Screening Stress"') and "Min_Cash" in live
+
+
+# --- Senior financing by deal size ----------------------------------------------------------
+
+from src.lbo_model import senior_markt  # noqa: E402
+
+
+@pytest.mark.parametrize(
+	"ebitda, aflossing, rente",
+	[(1_000_000, 1 / 7, 0.065), (5_000_000, 0.5 / 6 + 0.005, 0.070), (11_500_000, 0.01, 0.080)],
+)
+def test_senior_follows_the_market_for_the_deal_size(ebitda, aflossing, rente):
+	_, a, r = senior_markt(ebitda)
+	assert a == pytest.approx(aflossing) and r == rente
+
+
+def test_unitranche_amortises_one_percent_and_repays_at_exit(cijfers, monkeypatch):
+	monkeypatch.setattr(config, "LBO_SENIOR_MARKT", [(float("inf"), "Unitranche", 0.01, 0.08)])
+	monkeypatch.setattr(config, "LBO_CASH_SWEEP_PCT", 0.0)
+	rij = bouw_dataframe([cijfers]).iloc[0]
+	assert rij["Senior_Type"] == "Unitranche" and rij["Senior_Rente_Pct"] == pytest.approx(8.0)
+	model = rij["LBO_Scenarios"]["screening_base"]
+	senior_0 = model["LBO_Senior_Schuld"]
+	jaar = model["Jaren"][1]
+	assert jaar["Verplichte_Aflossing"] == pytest.approx(senior_0 * 0.01)
+	assert jaar["Rente_Senior"] == pytest.approx(senior_0 * 0.08)
+	assert model["Jaren"][-1]["Senior_Lening"] == pytest.approx(senior_0 * 0.95)  # the rest is in the exit net debt
+	assert model["LBO_Balanscheck"] == labels.CHECK_OK
+
+
+def test_bullet_debt_gives_more_capacity_than_amortising_debt(cijfers, monkeypatch):
+	bank = bouw_dataframe([cijfers]).iloc[0]["Debt_Capacity_Multiple"]
+	monkeypatch.setattr(config, "LBO_SENIOR_MARKT", [(float("inf"), "Unitranche", 0.01, 0.08)])
+	unitranche = bouw_dataframe([cijfers]).iloc[0]["Debt_Capacity_Multiple"]
+	assert unitranche > bank
