@@ -163,9 +163,14 @@ def bouw_dataframe(resultaten):
     )
     # Cash die nodig is voor de bedrijfsvoering, is niet vrij en telt dus niet als aftrek.
     # De behoefte hangt niet af van het schema: code 62 en 44 bestaan in elk schema.
+    # Cash-opex = personeel + overige kosten (netto, nooit negatief), dezelfde lijnen als de historiek in de Excel
+    df["Overige_Kosten_Cash"] = (
+        df["Omzet_of_Brutomarge"] - df["Inkoop"] - df["Personeelskosten"]
+        - (df["Gerapporteerde_EBITDA"] + df["Normalisatie_Bedrag"])
+    ).clip(lower=0)
     df["Minimum_Cash_Behoefte"] = (
-        df["Personeelskosten"] * config.MIN_CASH_MAANDEN_PERSONEEL / 12
-        + df["Handelsschulden"] * config.MIN_CASH_WEKEN_LEVERANCIERS * 7 / config.MIN_CASH_BETAALTERMIJN_DAGEN
+        (df["Personeelskosten"] + df["Overige_Kosten_Cash"]) * config.MIN_CASH_MAANDEN_OPEX / 12
+        + df["Inkoop"] * config.MIN_CASH_PCT_INKOOP
     )
     df["Minimum_Operationele_Cash"] = df["Minimum_Cash_Behoefte"].clip(lower=0, upper=df["Liquide_Middelen"])
     df["Net_Debt"] = net_debt(
@@ -434,6 +439,7 @@ def bouw_dataframe(resultaten):
         "Overige_Schulden_LT_en_KT",
         "Debt_Like_Items",
         "Intercompany_Cash_Like",
+        "Overige_Kosten_Cash",
         "Minimum_Cash_Behoefte",
         "Minimum_Operationele_Cash",
         "Adjusted_Net_Debt",

@@ -103,7 +103,9 @@ def test_verkort_schema_geeft_dezelfde_ebitda(filings, filings_vkt):
 	"""Het schema verandert de voorstelling, niet de winst."""
 	vol, vkt = status(filings), status(filings_vkt)
 	assert vkt["Genormaliseerde_EBITDA"] == pytest.approx(vol["Genormaliseerde_EBITDA"])
-	assert vkt["Adjusted_Net_Debt"] == pytest.approx(vol["Adjusted_Net_Debt"])
+	# Only the minimum cash differs: an abridged schema does not show purchases, so their share is 0
+	verschil = config.MIN_CASH_PCT_INKOOP * vol["Inkoop"]
+	assert vkt["Adjusted_Net_Debt"] == pytest.approx(vol["Adjusted_Net_Debt"] - verschil)
 
 
 def test_micro_schema_heeft_geen_toelichting(filings_mic):

@@ -147,11 +147,11 @@ LBO_MIN_IRR_PCT = 15.0           # Minimale IRR voor een sterke kandidaat
 # Screening
 MAX_MARGE_DALING_PP = 2.0        # Red flag als EBITDA-marge meer dan 2,0 procentpunt daalt
 CSV_TOLERANTIE_EUR = 5           # Toegestaan afrondingsverschil bij het narekenen van de CSV-totalen
-# Minimum operationele cash: gebaseerd op kosten die in elk schema bestaan. Aankopen (60/61) ontbreken in
-# verkorte en micro-schema's, dus die raming loopt via de handelsschulden (44) op de balans.
-MIN_CASH_MAANDEN_PERSONEEL = 1   # Maanden loon en RSZ (code 62)
-MIN_CASH_WEKEN_LEVERANCIERS = 2  # Weken leveranciersbetalingen
-MIN_CASH_BETAALTERMIJN_DAGEN = 60  # Handelsschulden = aankopen van zoveel dagen (wettelijk maximum B2B)
+# Minimum operationele cash: wat het bedrijf in kas moet houden om te draaien. Ze blijft in het bedrijf en
+# telt niet als vrije cash in de bridge. = maanden cash-opex (personeel + overige kosten, zonder inkoop)
+# + een deel van de jaarlijkse inkoop. Bij een brutomargeschema is de inkoop 0 (zit al in de brutomarge).
+MIN_CASH_MAANDEN_OPEX = 1        # Maanden personeelskosten en overige bedrijfskosten
+MIN_CASH_PCT_INKOOP = 0.01       # Deel van de jaarlijkse inkoop (60/61)
 MAX_GROEPSVORDERINGEN_PCT = 25.0 # Red flag als vorderingen op verbonden ondernemingen dit % van de balans overschrijden
 # Groepsvorderingen (9291) die in de overige vorderingen (41) zitten, bv. een cash pool:
 # - "cash_like": vereffend vóór closing. De verkoper krijgt ze betaald (aftrek in de Adjusted Net Debt) en ze

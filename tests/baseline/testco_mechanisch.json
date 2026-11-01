@@ -1,31 +1,31 @@
 {
   "Aantal_Red_Flags": 0,
-  "Adjusted_Net_Debt": -548666.6666666666,
+  "Adjusted_Net_Debt": -640000.0,
   "Check_Data": "OK",
   "Citaten": [],
   "Data_Volledigheid": "Complete",
   "Eigendom": "Ownership unknown",
   "Genormaliseerde_EBITDA": 1600000.0,
   "Indicatieve_EV": 8000000.0,
-  "Indicatieve_Equity_Value": 8548666.666666666,
+  "Indicatieve_Equity_Value": 8640000.0,
   "Instap_Multiple": 5.0,
   "LBO_Balanscheck": "OK",
   "LBO_EBITDA_Jaar5": 2126975.2823518594,
   "LBO_Eind_Net_Debt_to_EBITDA": -0.4,
   "LBO_Instap_EV": 8000000.0,
-  "LBO_Laagste_Cash": 479187.549081036,
+  "LBO_Laagste_Cash": 387340.46574770263,
   "LBO_RCF_Piek": 0.0,
   "LBO_Senior_Schuld": 4000000.0,
   "LBO_Sponsor_Equity_Instap": 3520000.0,
   "LBO_Status": "STRONG LBO CANDIDATE",
-  "Minimum_Operationele_Cash": 351333.3333333334,
+  "Minimum_Operationele_Cash": 260000.0,
   "Net_Debt": -900000.0,
   "Scenarios": {
     "base": {
       "Indicatieve_IRR_Pct": 26.7,
       "Indicatieve_MoIC": 3.26,
       "LBO_Convenanten": "OK",
-      "LBO_Hoogste_Leverage": 2.14,
+      "LBO_Hoogste_Leverage": 2.19,
       "LBO_Laagste_DSCR": 1.33,
       "LBO_Laagste_Rentedekking": 5.1
     },
@@ -33,7 +33,7 @@
       "Indicatieve_IRR_Pct": 16.8,
       "Indicatieve_MoIC": 2.17,
       "LBO_Convenanten": "OK",
-      "LBO_Hoogste_Leverage": 2.3,
+      "LBO_Hoogste_Leverage": 2.36,
       "LBO_Laagste_DSCR": 1.25,
       "LBO_Laagste_Rentedekking": 4.79
     },
@@ -41,7 +41,7 @@
       "Indicatieve_IRR_Pct": 26.7,
       "Indicatieve_MoIC": 3.26,
       "LBO_Convenanten": "OK",
-      "LBO_Hoogste_Leverage": 2.14,
+      "LBO_Hoogste_Leverage": 2.19,
       "LBO_Laagste_DSCR": 1.33,
       "LBO_Laagste_Rentedekking": 5.1
     },
@@ -49,7 +49,7 @@
       "Indicatieve_IRR_Pct": 21.4,
       "Indicatieve_MoIC": 2.64,
       "LBO_Convenanten": "BREACHED: Y1 DSCR 1.05x",
-      "LBO_Hoogste_Leverage": 2.86,
+      "LBO_Hoogste_Leverage": 2.93,
       "LBO_Laagste_DSCR": 1.05,
       "LBO_Laagste_Rentedekking": 4.08
     },
@@ -57,7 +57,7 @@
       "Indicatieve_IRR_Pct": 30.9,
       "Indicatieve_MoIC": 3.84,
       "LBO_Convenanten": "OK",
-      "LBO_Hoogste_Leverage": 2.07,
+      "LBO_Hoogste_Leverage": 2.12,
       "LBO_Laagste_DSCR": 1.37,
       "LBO_Laagste_Rentedekking": 5.25
     }

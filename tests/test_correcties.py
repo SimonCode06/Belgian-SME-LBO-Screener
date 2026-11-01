@@ -72,3 +72,26 @@ def test_director_receivable_gets_no_value_and_stays_a_heavy_flag(filings):
 	assert cijfers["Open_Intercompany_Cash_Like"] == 0.0
 	assert cijfers["Open_Overige_Activa_Niet_Operationeel"] == 50_000.0
 	assert "Receivable from directors" in rij_van(reeks)["Red_Flags"]
+
+
+# --- 3.2 Minimum cash ---------------------------------------------------------------------
+
+
+def test_minimum_cash_is_one_month_of_cash_opex_plus_a_share_of_purchases(filings):
+	rij = rij_van(filings)
+	# Testco 2024: personnel 2.2m, other costs 0.2m, purchases 6.0m
+	verwacht = (2_200_000 + 200_000) * config.MIN_CASH_MAANDEN_OPEX / 12 + 6_000_000 * config.MIN_CASH_PCT_INKOOP
+	assert rij["Minimum_Cash_Behoefte"] == pytest.approx(verwacht)
+	assert rij["Minimum_Operationele_Cash"] == pytest.approx(min(verwacht, rij["Liquide_Middelen"]))
+
+
+def test_minimum_cash_ignores_net_other_income(filings, monkeypatch):
+	"""Other operating income above other costs does not lower the cash the company needs."""
+	jaar = filings[-1]
+	codes = {**jaar.codes, "640/8": -500_000.0}
+	codes["60/66A"] = jaar.codes["60/66A"] - jaar.codes["640/8"] - 500_000.0
+	codes["9901"] = codes["70/76A"] - codes["60/66A"]
+	reeks = filings[:-1] + [replace(jaar, codes=codes)]
+	rij = rij_van(reeks)
+	assert rij["Overige_Kosten_Cash"] == 0.0
+	assert rij["Minimum_Cash_Behoefte"] == pytest.approx(2_200_000 / 12 + 6_000_000 * config.MIN_CASH_PCT_INKOOP)

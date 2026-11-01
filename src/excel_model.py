@@ -586,11 +586,9 @@ def _invoer(rij):
 		("Max_Leverage", config.LBO_COVENANT_MAX_LEVERAGE, stijl.FMT_MULT_2),
 		("Target_Leverage", config.LBO_TARGET_END_LEVERAGE, stijl.FMT_MULT_2),
 		("Days_Year", config.DAGEN_PER_JAAR, "0"),
-		("Days_Week", 7, "0"),
 		("Months_Year", 12, "0"),
-		("Min_Cash_Months", config.MIN_CASH_MAANDEN_PERSONEEL, stijl.FMT_GETAL),
-		("Min_Cash_Weeks", config.MIN_CASH_WEKEN_LEVERANCIERS, stijl.FMT_GETAL),
-		("Min_Cash_Term", config.MIN_CASH_BETAALTERMIJN_DAGEN, stijl.FMT_GETAL),
+		("Min_Cash_Months", config.MIN_CASH_MAANDEN_OPEX, stijl.FMT_GETAL),
+		("Min_Cash_Pct_Purchases", config.MIN_CASH_PCT_INKOOP, stijl.FMT_PCT),
 		("Goods_Basis", rij["Driver_Kosten_60_Pct"] / 100, stijl.FMT_PCT),
 		("Purchases_Basis", rij["Driver_Kosten_6061_Pct"] / 100, stijl.FMT_PCT),
 		("Bank_Excess_Only", 1 if bank["alleen_cash_boven_minimum"] else 0, "0"),
@@ -613,7 +611,8 @@ def _enkelvoudig_lbo(rij):
 		(
 			"min_req", "Min_Cash_Requirement", "f",
 			lambda c: (
-				f"=-{c.xa('pers')}*Min_Cash_Months/Months_Year+{c.xa('ap')}*Min_Cash_Weeks*Days_Week/Min_Cash_Term"
+				f"=(-{c.xa('pers')}+MAX(0,-{c.xa('opex')}))*Min_Cash_Months/Months_Year"
+				f"-{c.xa('cogs')}*Min_Cash_Pct_Purchases"
 			),
 			stijl.FMT_BEDRAG, "normaal",
 		),
