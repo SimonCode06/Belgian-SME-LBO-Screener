@@ -215,7 +215,7 @@ def koppel_tekst(cijfers, tekst, codes=None, paginas=None):
 	pdf_jaar = str(velden.pop("Boekjaar", ""))
 	if pdf_jaar != cijfers["Boekjaar"]:
 		signaal = labels.TEXT_WRONG_YEAR.format(pdf=pdf_jaar or labels.TEXT_UNKNOWN, figures=cijfers["Boekjaar"])
-		velden["Red_Flags"] = f"{signaal}; {velden.get('Red_Flags', '')}".strip("; ")
+		velden["Tekst_Signaal"] = signaal  # a data flag in vlaggen.py
 	return velden
 
 

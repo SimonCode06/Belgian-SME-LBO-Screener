@@ -12,7 +12,7 @@ naar de equity value voor de verkoper en naar de bediening van de nieuwe schuld.
 """
 import pandas as pd
 
-from . import assumpties, config, labels, normalisaties, structurering
+from . import assumpties, config, labels, normalisaties, structurering, vlaggen
 from .lbo_model import bereken_scenarios, kies_multiples, net_debt
 
 NIET_BESCHIKBAAR = float("nan")  # verschijnt als lege cel in Excel, niet als 0%
@@ -35,37 +35,6 @@ def _pct(teller, noemer):
 def _groei_pct(huidig, vorig):
     """Op basis van abs(vorig), zodat een negatieve basis het teken niet omdraait."""
     return round((huidig - vorig) / abs(vorig) * 100, 2) if vorig != 0 else NIET_BESCHIKBAAR
-
-
-def _zware_flags(rij):
-    """Feiten die een sterke kwalificatie uitsluiten. De analist moet ze eerst beoordelen."""
-    flags = []
-    if rij["Eigen_Vermogen"] < 0:
-        flags.append(labels.FLAG_NEGATIVE_EQUITY.format(value=rij["Eigen_Vermogen"]))
-    if rij["Overgedragen_Resultaat"] < 0:
-        flags.append(labels.FLAG_ACCUMULATED_LOSS.format(value=rij["Overgedragen_Resultaat"]))
-    if rij["Commissaris_Oordeel"] in labels.OPINIONS_HEAVY:
-        flags.append(labels.FLAG_AUDITOR.format(opinion=rij["Commissaris_Oordeel"]))
-    if labels.FLAG_LIQUIDATION in rij["Cijfer_Flags"]:
-        flags.append(labels.FLAG_LIQUIDATION)
-    if rij["Memo_Vorderingen_Bestuurders"] > 0:
-        flags.append(labels.FLAG_DIRECTOR_RECEIVABLE.format(value=rij["Memo_Vorderingen_Bestuurders"]))
-    if rij["Balanstotaal"] > 0:
-        groep_pct = rij["Memo_Vorderingen_Verbonden"] / rij["Balanstotaal"] * 100
-        if groep_pct > config.MAX_GROEPSVORDERINGEN_PCT:
-            flags.append(labels.FLAG_GROUP_RECEIVABLES.format(value=rij["Memo_Vorderingen_Verbonden"], pct=groep_pct))
-    if rij["Driver_EBITDA_CAGR_Pct"] < 0 and rij["LBO_Forecast_Groei_Pct"] > 0:
-        flags.append(
-            labels.FLAG_EBITDA_TREND.format(cagr=rij["Driver_EBITDA_CAGR_Pct"], growth=rij["LBO_Forecast_Groei_Pct"])
-        )
-    if rij["LBO_Downside_Convenanten"].startswith(labels.COVENANTS_BREACHED):
-        detail = rij["LBO_Downside_Convenanten"][len(labels.COVENANTS_BREACHED) + 2:]
-        flags.append(labels.FLAG_DOWNSIDE_COVENANTS.format(detail=detail))
-    if rij["LBO_RCF_Eind"] > 0:
-        flags.append(labels.FLAG_RCF_AT_EXIT.format(value=rij["LBO_RCF_Eind"]))
-    if rij["Memo_Zekerheden_Derden"] > max(rij["Genormaliseerde_EBITDA"], 0):
-        flags.append(labels.FLAG_THIRD_PARTY_GUARANTEES.format(value=rij["Memo_Zekerheden_Derden"]))
-    return flags
 
 
 def bouw_dataframe(resultaten):
@@ -336,53 +305,13 @@ def bouw_dataframe(resultaten):
     df["LBO_Integriteit"] = pd.Series([m["Integriteit"] for m in lbo_modellen], index=df.index, dtype=object)
     df["LBO_Scenarios"] = pd.Series(list(scenario_modellen), index=df.index, dtype=object)
 
-    df["Zware_Flags"] = df.apply(lambda r: "; ".join(_zware_flags(r)), axis=1)
-
-    # Automatische Red Flags voor TWC (Fase 2), Trends (Fase 3) en Schuldaflossing (Fase 4)
-    def verrijk_red_flags(rij):
-        bestaande = str(rij.get("Red_Flags", "") or "").strip()
-        extra_flags = [flag for flag in (rij["Zware_Flags"], rij["Cijfer_Flags"]) if flag]
-
-        if rij["Trade_Working_Capital"] < 0:
-            extra_flags.append(labels.FLAG_NEGATIVE_NWC.format(value=rij["Trade_Working_Capital"]))
-
-        if rij["Minimum_Cash_Behoefte"] > rij["Liquide_Middelen"]:
-            extra_flags.append(
-                labels.FLAG_LOW_CASH.format(cash=rij["Liquide_Middelen"], need=rij["Minimum_Cash_Behoefte"])
-            )
-
-        extra_flags.extend(labels.FLAG_ASSUMPTIONS.format(detail=vlag) for vlag in rij["LBO_Assumptie_Vlaggen"])
-
-        if config.LBO_CLOSING_DATUM and rij["LBO_Closing_Datum"] and rij["LBO_Closing_Datum"] < config.LBO_CLOSING_DATUM:
-            extra_flags.append(labels.FLAG_CLOSING_LIMITED.format(date=rij["LBO_Closing_Datum"]))
-
-        if rij["LBO_Cash_Onder_Minimum"] > 0:
-            extra_flags.append(labels.FLAG_CASH_BELOW_MINIMUM.format(value=rij["LBO_Cash_Onder_Minimum"]))
-
-        if rij["Omzet_of_Brutomarge_Vorig_Jaar"] > 0 and rij["Omzetgroei_Pct"] < 0:
-            extra_flags.append(labels.FLAG_REVENUE_DECLINE.format(value=rij["Omzetgroei_Pct"]))
-
-        if (
-            rij["Omzet_of_Brutomarge_Vorig_Jaar"] > 0
-            and rij["Marge_Verandering_pp"] < -config.MAX_MARGE_DALING_PP
-        ):
-            extra_flags.append(labels.FLAG_MARGIN_DECLINE.format(value=rij["Marge_Verandering_pp"]))
-
-        if (
-            rij["Genormaliseerde_EBITDA"] > 0
-            and rij["LBO_Eind_Net_Debt_to_EBITDA"] >= config.LBO_TARGET_END_LEVERAGE
-        ):
-            extra_flags.append(labels.FLAG_LEVERAGE_TARGET.format(value=rij["LBO_Eind_Net_Debt_to_EBITDA"]))
-
-        if rij["LBO_RCF_Piek"] > 0:
-            extra_flags.append(labels.FLAG_RCF_NEEDED.format(peak=rij["LBO_RCF_Piek"], limit=rij["LBO_RCF_Limiet"]))
-
-        if extra_flags:
-            prefix = "; ".join(extra_flags)
-            return f"{prefix}; {bestaande}" if bestaande else prefix
-        return bestaande
-
-    df["Red_Flags"] = df.apply(verrijk_red_flags, axis=1)
+    # Phase 5.1: structured red flags (source, category, severity); the text column is the summary
+    if "AI_Red_Flags" not in df:
+        df["AI_Red_Flags"] = pd.Series([[] for _ in range(len(df))], index=df.index, dtype=object)
+    df["Red_Flag_Lijst"] = pd.Series([vlaggen.bouw_vlaggen(r) for _, r in df.iterrows()], index=df.index, dtype=object)
+    df["Red_Flags"] = [vlaggen.als_tekst(lijst) for lijst in df["Red_Flag_Lijst"]]
+    df["Aantal_Hoge_Vlaggen"] = [vlaggen.tel(lijst, "hoog") for lijst in df["Red_Flag_Lijst"]]
+    df["Aantal_Middel_Vlaggen"] = [vlaggen.tel(lijst, "middel") for lijst in df["Red_Flag_Lijst"]]
 
     def bepaal_status(rij):
         if rij["Check_Data"] != labels.CHECK_OK:
@@ -403,7 +332,7 @@ def bouw_dataframe(resultaten):
             return labels.STATUS_NO_GO_DEBT
         if rij["Indicatieve_IRR_Pct"] < 0:
             return labels.STATUS_NO_GO_RETURN
-        if rij["Zware_Flags"]:
+        if rij["Aantal_Hoge_Vlaggen"]:
             return labels.STATUS_POSSIBLE_FLAGS
         if (
             rij["Data_Volledigheid"] == labels.DATA_COMPLETE
@@ -592,6 +521,9 @@ def bouw_dataframe(resultaten):
         "Commissaris_Oordeel",
         "Buitenbalans_Verplichtingen",
         "Red_Flags",
+        "Aantal_Hoge_Vlaggen",
+        "Aantal_Middel_Vlaggen",
+        "Red_Flag_Lijst",
         "Eigendom",
         "Kwalitatief_LBO_Oordeel",
         "AI_Business_Model",

@@ -142,7 +142,8 @@ FLAG_GROUP_RECEIVABLES = "Receivables from affiliated companies (EUR {value:,.0f
 FLAG_EBITDA_TREND = (
 	"Historical EBITDA declines ({cagr:+.1f}% p.a.) while the forecast grows ({growth:+.1f}%): return may be overstated"
 )
-FLAG_DOWNSIDE_COVENANTS = "Downside scenario breaches the Covenants ({detail})"
+FLAG_DOWNSIDE_COVENANTS = "Analyst case: the AI downside breaches the Covenants ({detail})"
+FLAG_STRESS_COVENANTS = "Screening Stress breaches the Covenants at the table structure ({detail})"
 FLAG_RCF_AT_EXIT = "RCF still drawn EUR {value:,.0f} at exit: the shortfall is structural, not temporary"
 FLAG_THIRD_PARTY_GUARANTEES = "Guarantees for third parties or the group (EUR {value:,.0f}) exceed EBITDA"
 FLAG_LOW_CASH = "Cash & Cash Equivalents (EUR {cash:,.0f}) below the minimum cash requirement (EUR {need:,.0f})"
@@ -785,6 +786,8 @@ COLUMN_LABELS = {
 	"LBO_Snapshot_Datum": "Snapshot Date",
 	"LBO_Snapshot_Status": "Snapshot Status",
 	"Run_Manifest": "Run Manifest",
+	"Aantal_Hoge_Vlaggen": "Red Flags: High (Counted)",
+	"Aantal_Middel_Vlaggen": "Red Flags: Medium (Counted)",
 	"Eigendom": "Ownership",
 	"AI_Business_Model": "Business Model (AI)",
 	"AI_Investment_Thesis": "Investment Thesis (AI)",

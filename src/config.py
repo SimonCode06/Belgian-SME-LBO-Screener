@@ -179,6 +179,31 @@ CSV_TOLERANTIE_EUR = 5           # Toegestaan afrondingsverschil bij het nareken
 MIN_CASH_MAANDEN_OPEX = 1        # Maanden personeelskosten en overige bedrijfskosten
 MIN_CASH_PCT_INKOOP = 0.01       # Deel van de jaarlijkse inkoop (60/61)
 MAX_GROEPSVORDERINGEN_PCT = 25.0 # Red flag als vorderingen op verbonden ondernemingen dit % van de balans overschrijden
+# Vaste ernst per modelvlag (vlaggen.py): hoog / middel / laag. AI-vlaggen hebben hun ernst uit de tekstpass.
+# Een hoge vlag sluit 'STRONG' uit en kost 40 punten in de governance-score, een middelzware 15.
+FLAG_ERNST = {
+	"negatief_eigen_vermogen": "hoog",
+	"commissaris": "hoog",
+	"vereffening": "hoog",
+	"overgedragen_verlies": "middel",
+	"vordering_bestuurders": "middel",
+	"groepsvorderingen": "middel",
+	"zekerheden_derden": "middel",
+	"ebitda_trend": "middel",
+	"margedaling": "middel",
+	"rcf_exit": "middel",
+	"cash_onder_minimum": "middel",
+	"stress_convenanten": "middel",
+	"ai_downside": "middel",
+	"negatief_nwc": "laag",
+	"lage_cash": "laag",
+	"omzetdaling": "laag",
+	"leverage_doel": "laag",
+	"rcf_nodig": "laag",
+	"closing_beperkt": "laag",
+	"data_signaal": "laag",
+	"ai_assumptie": "laag",
+}
 # Groepsvorderingen (9291) die in de overige vorderingen (41) zitten, bv. een cash pool:
 # - "cash_like": vereffend vóór closing. De verkoper krijgt ze betaald (aftrek in de Adjusted Net Debt) en ze
 #   verdwijnen uit de openingsbalans. Zo werkt een cash pool bij een carve-out.

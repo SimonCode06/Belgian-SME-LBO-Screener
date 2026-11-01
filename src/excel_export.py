@@ -159,7 +159,7 @@ MULT_KOLOMMEN = {
 GEEN_BEDRAG_KOLOMMEN = {"Boekjaar", "Boekjaar_Begin", "Boekjaar_Einde", "LBO_Closing_Datum", "Ondernemingsnummer"}
 OBJECT_KOLOMMEN = [
 	"LBO_Jaren", "LBO_Integriteit", "LBO_Scenarios", "LBO_Assumpties", "LBO_Assumptie_Vlaggen", "LBO_Driver_Pack",
-	"AI_Normalisaties", "LBO_Adjustments", "AI_Red_Flags", "AI_Eigendom", "AI_Buitenbalans", "AI_Investment_Thesis", "AI_DD_Vragen",
+	"AI_Normalisaties", "LBO_Adjustments", "AI_Red_Flags", "Red_Flag_Lijst", "AI_Eigendom", "AI_Buitenbalans", "AI_Investment_Thesis", "AI_DD_Vragen",
 ]
 
 

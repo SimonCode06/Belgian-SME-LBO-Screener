@@ -162,7 +162,7 @@ def test_koppel_tekst_checks_the_company(cijfers):
 	verkeerd = app.koppel_tekst(cijfers, antwoord(ondernemingsnummer="0999.999.999"), {}, None)
 	assert verkeerd["Commissaris_Oordeel"] == labels.OPINION_UNKNOWN and verkeerd["AI_Normalisaties"] == []
 	ander_jaar = app.koppel_tekst(cijfers, antwoord(boekjaar="2023"), {}, None)
-	assert ander_jaar["Red_Flags"].startswith(labels.TEXT_WRONG_YEAR.format(pdf="2023", figures="2024"))
+	assert ander_jaar["Tekst_Signaal"] == labels.TEXT_WRONG_YEAR.format(pdf="2023", figures="2024")
 
 
 def test_an_old_cache_format_counts_as_no_cache(tmp_path):
