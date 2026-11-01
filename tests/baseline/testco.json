@@ -17,49 +17,49 @@
   "LBO_RCF_Piek": 0.0,
   "LBO_Senior_Schuld": 3879999.9999999995,
   "LBO_Sponsor_Equity_Instap": 3527200.0,
-  "LBO_Status": "POSSIBLE CANDIDATE (See Red Flags)",
+  "LBO_Status": "NO-GO (New Debt Not Serviceable)",
   "Minimum_Operationele_Cash": 260000.0,
   "Net_Debt": -900000.0,
   "Scenarios": {
     "base": {
       "Indicatieve_IRR_Pct": 22.4,
       "Indicatieve_MoIC": 2.75,
-      "LBO_Convenanten": "OK",
-      "LBO_Hoogste_Leverage": 2.27,
-      "LBO_Laagste_DSCR": 1.34,
-      "LBO_Laagste_Rentedekking": 5.11
+      "LBO_Convenanten": "BREACHED: Y1 DSCR 1.20x",
+      "LBO_Hoogste_Leverage": 1.79,
+      "LBO_Laagste_DSCR": 1.2,
+      "LBO_Laagste_Rentedekking": 6.35
     },
     "downside": {
       "Indicatieve_IRR_Pct": 12.0,
       "Indicatieve_MoIC": 1.76,
-      "LBO_Convenanten": "BREACHED: Y1 DSCR 1.16x",
-      "LBO_Hoogste_Leverage": 2.77,
-      "LBO_Laagste_DSCR": 1.16,
-      "LBO_Laagste_Rentedekking": 4.49
+      "LBO_Convenanten": "BREACHED: Y1 DSCR 0.87x",
+      "LBO_Hoogste_Leverage": 2.23,
+      "LBO_Laagste_DSCR": 0.87,
+      "LBO_Laagste_Rentedekking": 5.57
     },
     "screening_base": {
       "Indicatieve_IRR_Pct": 26.6,
       "Indicatieve_MoIC": 3.26,
       "LBO_Convenanten": "OK",
-      "LBO_Hoogste_Leverage": 2.11,
-      "LBO_Laagste_DSCR": 1.37,
-      "LBO_Laagste_Rentedekking": 5.24
+      "LBO_Hoogste_Leverage": 1.65,
+      "LBO_Laagste_DSCR": 1.42,
+      "LBO_Laagste_Rentedekking": 6.51
     },
     "screening_stress": {
       "Indicatieve_IRR_Pct": 21.4,
       "Indicatieve_MoIC": 2.64,
-      "LBO_Convenanten": "BREACHED: Y1 DSCR 1.08x",
-      "LBO_Hoogste_Leverage": 2.83,
-      "LBO_Laagste_DSCR": 1.08,
-      "LBO_Laagste_Rentedekking": 4.19
+      "LBO_Convenanten": "BREACHED: Y1 DSCR 1.11x",
+      "LBO_Hoogste_Leverage": 2.24,
+      "LBO_Laagste_DSCR": 1.11,
+      "LBO_Laagste_Rentedekking": 5.2
     },
     "upside": {
       "Indicatieve_IRR_Pct": 30.8,
       "Indicatieve_MoIC": 3.83,
       "LBO_Convenanten": "OK",
-      "LBO_Hoogste_Leverage": 1.87,
+      "LBO_Hoogste_Leverage": 1.45,
       "LBO_Laagste_DSCR": 1.53,
-      "LBO_Laagste_Rentedekking": 5.76
+      "LBO_Laagste_Rentedekking": 7.15
     }
   },
   "Senior_Multiple": 2.425

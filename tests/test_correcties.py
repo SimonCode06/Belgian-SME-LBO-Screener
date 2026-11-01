@@ -265,3 +265,36 @@ def test_multiples_rise_monotonically_and_stay_flat_outside_the_anchors():
 	assert kies_multiples(100_000.0) == (4.0, 1.5) and kies_multiples(20_000_000.0) == (7.0, 3.5)
 	assert kies_multiples(750_000.0) == (4.5, 2.0)
 	assert kies_multiples(1_250_000.0) == pytest.approx((4.75, 2.25))
+
+
+# --- 3.6 Covenant definitions --------------------------------------------------------------
+
+
+def test_bank_covenants_year_1_by_hand(cijfers):
+	jaar = bouw_dataframe([cijfers]).iloc[0]["LBO_Scenarios"]["base"]["Jaren"][1]
+	bankrente = jaar["Rente_Senior"] + jaar["Rente_RCF"] + jaar["Commitment_Fee"]
+	cfads = jaar["EBITDA"] - jaar["Belasting"] - jaar["Capex"] - jaar["Delta_TWC"] - jaar["Delta_Overig"]
+	assert jaar["CFADS"] == pytest.approx(cfads)
+	assert jaar["DSCR"] == pytest.approx(cfads / (bankrente + jaar["Verplichte_Aflossing"]))
+	assert jaar["Rentedekking"] == pytest.approx(jaar["EBITDA"] / bankrente)  # without the subordinated vendor loan
+	assert jaar["Leverage"] == pytest.approx((jaar["Senior_Lening"] + jaar["RCF"] - jaar["Cash"]) / jaar["EBITDA"])
+	totaal = (jaar["Senior_Lening"] + jaar["RCF"] + jaar["Vendor_Loan"] - jaar["Cash"]) / jaar["EBITDA"]
+	assert jaar["Leverage_Totaal"] == pytest.approx(totaal)
+
+
+def test_old_covenant_definitions_can_be_restored(cijfers, monkeypatch):
+	monkeypatch.setattr(config, "LBO_COVENANT_DEFINITIE", "oud")
+	jaar = bouw_dataframe([cijfers]).iloc[0]["LBO_Scenarios"]["base"]["Jaren"][1]
+	assert jaar["DSCR"] == pytest.approx(
+		(jaar["EBITDA"] - jaar["Capex"] - jaar["Belasting"]) / (jaar["Rente"] + jaar["Verplichte_Aflossing"])
+	)
+	assert jaar["Rentedekking"] == pytest.approx(jaar["EBITDA"] / jaar["Rente"])
+	assert jaar["Leverage"] == pytest.approx(jaar["Leverage_Totaal"])
+
+
+def test_vendor_loan_counts_in_the_icr_when_not_subordinated(cijfers, monkeypatch):
+	monkeypatch.setattr(config, "LBO_VENDOR_ACHTERGESTELD", False)
+	jaar = bouw_dataframe([cijfers]).iloc[0]["LBO_Scenarios"]["base"]["Jaren"][1]
+	assert jaar["Rentedekking"] == pytest.approx(
+		jaar["EBITDA"] / (jaar["Rente_Senior"] + jaar["Rente_RCF"] + jaar["Commitment_Fee"] + jaar["Rente_Vendor"])
+	)

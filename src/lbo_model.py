@@ -218,6 +218,31 @@ def _deel(waarde, noemer):
 	return waarde / noemer if noemer > 0 else NIET_BESCHIKBAAR
 
 
+def _convenantratios(ebitda, ebitda_jaar, capex, delta_twc, delta_overig, ronde, senior, rcf, vendor, cash, minimum_cash):
+	"""DSCR, interest coverage en leverage volgens config.LBO_COVENANT_DEFINITIE (zie config.py)."""
+	totale_schuld = senior + rcf + vendor
+	totaal = _deel(net_debt("bank_covenant", totale_schuld, cash, minimum_cash), ebitda_jaar)
+	if config.LBO_COVENANT_DEFINITIE == "oud":
+		return {
+			"CFADS": ebitda - capex - ronde["Belasting"],
+			"Rentedekking": _deel(ebitda, ronde["Rente"]),
+			"DSCR": _deel(ebitda - capex - ronde["Belasting"], ronde["Rente"] + ronde["Verplichte_Aflossing"]),
+			"Leverage": totaal,
+			"Leverage_Totaal": totaal,
+		}
+	bankrente = ronde["Rente_Senior"] + ronde["Rente_RCF"] + ronde["Commitment_Fee"]
+	if not config.LBO_VENDOR_ACHTERGESTELD:
+		bankrente += ronde["Rente_Vendor"]
+	cfads = ebitda - ronde["Belasting"] - capex - delta_twc - delta_overig
+	return {
+		"CFADS": cfads,
+		"Rentedekking": _deel(ebitda, bankrente),
+		"DSCR": _deel(cfads, bankrente + ronde["Verplichte_Aflossing"]),
+		"Leverage": _deel(senior + rcf - cash, ebitda_jaar),
+		"Leverage_Totaal": totaal,
+	}
+
+
 def _toets_convenanten(jaren):
 	"""Geeft per geschonden convenant de periode en de waarde."""
 	breuken = []
@@ -599,11 +624,12 @@ def bereken_lbo(rij, scenario="base"):
 				RCF_Ruimte=rcf_limiet - rcf,
 				Cash_Waterval=cash_waterval,
 				Iteratie_Restverschil=restverschil,
-				Rentedekking=_deel(ebitda, ronde["Rente"]),
-				DSCR=_deel(
-					ebitda - capex - ronde["Belasting"], ronde["Rente"] + ronde["Verplichte_Aflossing"]
+				**_convenantratios(
+					ebitda, ebitda_op_jaarbasis, capex,
+					# De normalisatie van het werkkapitaal is bij closing al gefinancierd: niet in de CFADS
+					delta_twc - (posten["NWC_Normalisatie"] - posten_begin["NWC_Normalisatie"]),
+					delta_overig, ronde, senior, rcf, vendor, cash, minimum_cash,
 				),
-				Leverage=_deel(net_debt("bank_covenant", schuld, cash, minimum_cash), ebitda_op_jaarbasis),
 			)
 		)
 

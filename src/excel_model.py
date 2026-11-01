@@ -503,21 +503,11 @@ def _rijen_lbo():
 			jaar=lambda c: f"={c.p('res_close')}+{c.x('ni')}-{c.h('w_div')}",
 		),
 		Sectie(labels.SECTION_COVENANTS),
-		Rij(
-			"c_icr",
-			fmt=stijl.FMT_MULT_2,
-			jaar=lambda c: f'=IF({c.h("i_total")}>0,{c.h("w_ebitda")}/{c.h("i_total")},"")',
-		),
+		Rij("c_cfads", jaar=lambda c: _cfads_formule(c)),
+		Rij("c_icr", fmt=stijl.FMT_MULT_2, jaar=lambda c: _icr_formule(c)),
 		Rij("c_icr_min", fmt=stijl.FMT_MULT_2, jaar=lambda c: "=Min_ICR"),
 		Rij("c_icr_room", fmt=stijl.FMT_MULT_2, jaar=lambda c: f'=IF({c.h("c_icr")}="","",{c.h("c_icr")}-{c.h("c_icr_min")})'),
-		Rij(
-			"c_dscr",
-			fmt=stijl.FMT_MULT_2,
-			jaar=lambda c: (
-				f'=IF({c.h("i_total")}+{c.h("d_mand")}>0,({c.h("w_ebitda")}+{c.h("w_capex")}+{c.h("w_tax")})'
-				f'/({c.h("i_total")}+{c.h("d_mand")}),"")'
-			),
-		),
+		Rij("c_dscr", fmt=stijl.FMT_MULT_2, jaar=lambda c: _dscr_formule(c)),
 		Rij("c_dscr_min", fmt=stijl.FMT_MULT_2, jaar=lambda c: "=Min_DSCR"),
 		Rij("c_dscr_room", fmt=stijl.FMT_MULT_2, jaar=lambda c: f'=IF({c.h("c_dscr")}="","",{c.h("c_dscr")}-{c.h("c_dscr_min")})'),
 		Rij(
@@ -530,8 +520,9 @@ def _rijen_lbo():
 			closing=lambda c: _net_debt_formule(c, "Val"),
 			jaar=lambda c: _net_debt_formule(c, "Val"),
 		),
+		Rij("c_lev", fmt=stijl.FMT_MULT_2, jaar=lambda c: _leverage_formule(c)),
 		Rij(
-			"c_lev",
+			"c_lev_total",
 			fmt=stijl.FMT_MULT_2,
 			jaar=lambda c: (
 				f'=IF({c.h("w_ebitda")}/{c.x("fractie")}>0,{c.h("nd_bank")}/({c.h("w_ebitda")}/{c.x("fractie")}),"")'
@@ -548,6 +539,39 @@ def _rijen_lbo():
 			),
 		),
 	]
+
+
+def _bankrente(c):
+	"""Interest the senior lenders test: senior, RCF and commitment fee (plus the vendor loan if not subordinated)."""
+	if config.LBO_COVENANT_DEFINITIE == "oud":
+		return c.h("i_total")
+	rente = f"{c.h('i_senior')}+{c.h('i_rcf')}+{c.h('i_commit')}"
+	return rente if config.LBO_VENDOR_ACHTERGESTELD else f"{rente}+{c.h('i_vendor')}"
+
+
+def _cfads_formule(c):
+	"""EBITDA - tax - capex - change in working capital and other operating items (all signed as cash flows)."""
+	if config.LBO_COVENANT_DEFINITIE == "oud":
+		return f"={c.h('w_ebitda')}+{c.h('w_tax')}+{c.h('w_capex')}"
+	# The NWC normalisation is funded at closing (cash retained), so it is not part of the debt service capacity
+	return f"={c.h('w_ebitda')}+{c.h('w_tax')}+{c.h('w_capex')}+{c.h('w_twc')}-{c.x('cf_nwcn')}+{c.h('w_oth')}"
+
+
+def _icr_formule(c):
+	rente = _bankrente(c)
+	return f'=IF(({rente})>0,{c.h("w_ebitda")}/({rente}),"")'
+
+
+def _dscr_formule(c):
+	dienst = f"{_bankrente(c)}+{c.h('d_mand')}"
+	return f'=IF(({dienst})>0,{c.h("c_cfads")}/({dienst}),"")'
+
+
+def _leverage_formule(c):
+	"""Senior net debt / EBITDA (bank), or all financial debt as before ('oud')."""
+	ebitda = f"({c.h('w_ebitda')}/{c.x('fractie')})"
+	schuld = c.h("nd_bank") if config.LBO_COVENANT_DEFINITIE == "oud" else f"({c.h('d_senior')}+{c.h('d_rcf')}-{c.x('cash')})"
+	return f'=IF({ebitda}>0,{schuld}/{ebitda},"")'
 
 
 def _net_debt_formule(c, doel):

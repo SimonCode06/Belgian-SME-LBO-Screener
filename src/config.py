@@ -117,10 +117,18 @@ NET_DEBT_DEFINITIES = {
 	},
 }
 
-# Convenanten: worden elk jaar getest
-LBO_COVENANT_MIN_DSCR = 1.20     # (EBITDA - capex - belasting) / (rente + verplichte aflossing)
-LBO_COVENANT_MIN_RENTEDEKKING = 3.0  # EBITDA / rente
-LBO_COVENANT_MAX_LEVERAGE = 4.0  # Net Debt (definitie bank_covenant) / EBITDA
+# Convenanten: worden elk jaar getest. "bank" volgt hoe een senior lender ze test:
+# - Leverage = senior net debt (senior + RCF - cash) / EBITDA; totale leverage met vendor loan is informatie
+# - Interest coverage = EBITDA / (rente senior + RCF + commitment fee), zonder de achtergestelde vendor loan
+# - DSCR = CFADS / (rente senior + RCF + commitment fee + verplichte aflossing),
+#   CFADS = EBITDA - belasting - capex - toename werkkapitaal - toename overige operationele posten
+# "oud" zet de vroegere definities terug: (EBITDA - capex - belasting) / (alle rente + aflossing),
+# EBITDA / alle rente en (alle financiële schuld - cash) / EBITDA.
+LBO_COVENANT_DEFINITIE = "bank"   # "bank" of "oud"
+LBO_VENDOR_ACHTERGESTELD = True   # Vendor loan achtergesteld op de senior lening: buiten ICR en DSCR
+LBO_COVENANT_MIN_DSCR = 1.20
+LBO_COVENANT_MIN_RENTEDEKKING = 3.0
+LBO_COVENANT_MAX_LEVERAGE = 4.0
 
 # Fiscaliteit
 LBO_TAX_RATE = 0.25              # Belgische vennootschapsbelasting (25,0%)
