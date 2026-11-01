@@ -59,6 +59,12 @@ RIJVELDEN = (
 	"LBO_Laagste_Cash",
 	"LBO_RCF_Piek",
 	"LBO_Balanscheck",
+	"Debt_Capacity_Multiple",
+	"Debt_Capacity_Bindend",
+	"ATP_Max_Entry_Multiple",
+	"ATP_Headroom_Pct",
+	"ATP_Status",
+	"ATP_AI_Max_Entry_Multiple",
 )
 # Velden per scenario (base, downside, upside)
 SCENARIOVELDEN = (

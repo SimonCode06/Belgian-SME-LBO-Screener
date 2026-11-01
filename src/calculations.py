@@ -12,7 +12,7 @@ naar de equity value voor de verkoper en naar de bediening van de nieuwe schuld.
 """
 import pandas as pd
 
-from . import assumpties, config, labels, normalisaties
+from . import assumpties, config, labels, normalisaties, structurering
 from .lbo_model import bereken_scenarios, kies_multiples, net_debt
 
 NIET_BESCHIKBAAR = float("nan")  # verschijnt als lege cel in Excel, niet als 0%
@@ -322,6 +322,9 @@ def bouw_dataframe(resultaten):
     df["LBO_Stress_IRR_Pct"] = [m["screening_stress"]["Indicatieve_IRR_Pct"] for m in scenario_modellen]
     df["LBO_Stress_Laagste_DSCR"] = [m["screening_stress"]["LBO_Laagste_DSCR"] for m in scenario_modellen]
     df["LBO_Stress_Convenanten"] = [m["screening_stress"]["LBO_Convenanten"] for m in scenario_modellen]
+    # Phase 4: debt capacity (Screening Stress) and ability-to-pay (Screening Base, and AI base as information)
+    structuur = pd.DataFrame([structurering.analyseer(r) for _, r in df.iterrows()], index=df.index)
+    df = pd.concat([df, structuur], axis=1)
     df["LBO_IRR_Exact_Pct"] = [m["LBO_IRR_Exact_Pct"] for m in lbo_modellen]
     df["LBO_MoIC_Exact"] = [m["LBO_MoIC_Exact"] for m in lbo_modellen]
     df["LBO_Forecast_Groei_Pct"] = [
@@ -553,6 +556,21 @@ def bouw_dataframe(resultaten):
         "LBO_Stress_IRR_Pct",
         "LBO_Stress_Laagste_DSCR",
         "LBO_Stress_Convenanten",
+        "Debt_Capacity_Multiple",
+        "Debt_Capacity_EUR",
+        "Debt_Capacity_Bindend",
+        "Debt_Capacity_Status",
+        "ATP_Senior_Multiple",
+        "ATP_Max_Entry_Multiple",
+        "ATP_Max_EV",
+        "ATP_IRR_Pct",
+        "ATP_Headroom_Pct",
+        "ATP_Max_Equity_Price",
+        "ATP_Status",
+        "ATP_AI_Max_Entry_Multiple",
+        "ATP_AI_Max_EV",
+        "ATP_AI_Headroom_Pct",
+        "ATP_AI_Status",
         "LBO_IRR_Exact_Pct",
         "LBO_MoIC_Exact",
         "LBO_Forecast_Groei_Pct",

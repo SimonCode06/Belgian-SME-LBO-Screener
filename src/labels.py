@@ -249,6 +249,21 @@ ASSUMPTION_FLAG_EBITDA_CAGR = (
 )
 DD_LINKED_TO = "tests"
 ASSUMPTION_LEDGER = "Lowered by {pp:.2f} pp for the approved EBITDA adjustments (ledger)"
+CAPACITY_OK = "OK"
+CAPACITY_NONE = "No debt capacity"
+CAPACITY_NA = "N/A"
+BINDING_DSCR = "DSCR Y{year}"
+BINDING_ICR = "Interest Coverage Y{year}"
+BINDING_LEVERAGE = "Leverage Y{year}"
+BINDING_CASH = "Minimum Cash Y{year}"
+BINDING_EBITDA = "EBITDA negative Y{year}"
+BINDING_RCF = "RCF at Exit"
+BINDING_CAP = "Upper bound of the search reached"
+BINDING_NONE = "-"
+ATP_OK = "OK"
+ATP_NOT_ACHIEVABLE = "Not achievable at target IRR"
+ATP_CAP = "Above the search range"
+ATP_NA = "N/A"
 QUOTE_NOT_FOUND = "Quoted source not found in the PDF: confidence set to low"
 AMOUNT_FROM_CSV = "CSV code {code}"
 AMOUNT_AI_UNVERIFIED = "AI, to be verified"
@@ -660,6 +675,21 @@ COLUMN_LABELS = {
 	"NWC_Aanpassing": "NWC Adjustment (to Seller)",
 	"Ledger_EBITDA": "Approved EBITDA Adjustments (Ledger)",
 	"Driver_DSO_Excl_BTW": "DSO excl. VAT (KPI)",
+	"Debt_Capacity_Multiple": "Debt Capacity (x EBITDA, Screening Stress)",
+	"Debt_Capacity_EUR": "Debt Capacity (EUR)",
+	"Debt_Capacity_Bindend": "Binding Constraint",
+	"Debt_Capacity_Status": "Debt Capacity Status",
+	"ATP_Senior_Multiple": "Senior Debt Used for Ability-to-Pay (x)",
+	"ATP_Max_Entry_Multiple": "Max Entry Multiple at Target IRR (Screening)",
+	"ATP_Max_EV": "Max EV at Target IRR (Screening)",
+	"ATP_IRR_Pct": "IRR at Max EV (Screening)",
+	"ATP_Headroom_Pct": "Price Headroom vs Indicative EV (Screening)",
+	"ATP_Max_Equity_Price": "Max Equity Price (Screening)",
+	"ATP_Status": "Ability-to-Pay Status (Screening)",
+	"ATP_AI_Max_Entry_Multiple": "Max Entry Multiple at Target IRR (AI Base)",
+	"ATP_AI_Max_EV": "Max EV at Target IRR (AI Base)",
+	"ATP_AI_Headroom_Pct": "Price Headroom vs Indicative EV (AI Base)",
+	"ATP_AI_Status": "Ability-to-Pay Status (AI Base)",
 	"Open_Intercompany_Cash_Like": "Opening: Intercompany Cash-Like",
 	"Voorraden": "Inventory",
 	"Handelsvorderingen": "Trade Receivables",

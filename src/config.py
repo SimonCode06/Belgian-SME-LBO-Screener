@@ -38,6 +38,16 @@ LBO_MULTIPLE_ANKERS = [
 ]
 LBO_MIN_EBITDA = 250_000         # Daaronder is een LBO niet realistisch
 
+# Debt capacity en ability-to-pay (structurering.py), altijd op de screening case
+LBO_MAX_SENIOR_MULTIPLE = 4.0    # Bovengrens van de zoektocht naar de schuldcapaciteit (x EBITDA)
+LBO_DEBT_CAPACITY_MIN = 0.5      # Haalt het bedrijf de covenants al niet bij deze senior multiple: geen schuldcapaciteit
+LBO_DEBT_CAPACITY_PRECISIE = 0.05  # Precisie van de bisectie op de senior multiple
+LBO_BISECTIE_MAX_ITERATIES = 30
+LBO_ATP_MIN_MULTIPLE = 2.0       # Zoekbereik van de maximale instapmultiple
+LBO_ATP_MAX_MULTIPLE = 12.0
+LBO_ATP_IRR_PRECISIE_PP = 0.05   # De IRR bij de gevonden multiple ligt zo dicht bij de doel-IRR
+LBO_MIN_SPONSOR_EQUITY_PCT = 0.30  # Minimale inbreng van de sponsor (deel van prijs + kosten): begrenst de schuld
+
 # Financiering
 LBO_SENIOR_RENTE = 0.065         # Rente op de amortiserende senior lening (6,5% p.j.)
 LBO_SENIOR_LOOPTIJD_JAAR = 7     # Lineaire aflossing van de senior lening
