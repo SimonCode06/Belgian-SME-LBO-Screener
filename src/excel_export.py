@@ -72,6 +72,11 @@ OVERZICHT_KOLOMMEN = [
 	("Indicatieve_IRR_Pct", labels.GROUP_RETURNS, 9),
 	("LBO_Downside_IRR_Pct", labels.GROUP_RETURNS, 10),
 	("LBO_Downside_Convenanten", labels.GROUP_RETURNS, 28),
+	("LBO_Screening_IRR_Pct", labels.GROUP_SCREENING, 10),
+	("LBO_Screening_Convenanten", labels.GROUP_SCREENING, 22),
+	("LBO_Stress_IRR_Pct", labels.GROUP_SCREENING, 10),
+	("LBO_Stress_Laagste_DSCR", labels.GROUP_SCREENING, 10),
+	("LBO_Stress_Convenanten", labels.GROUP_SCREENING, 28),
 ]
 
 TEKST_KOLOMMEN = {
@@ -82,6 +87,8 @@ TEKST_KOLOMMEN = {
 	"Buitenbalans_Verplichtingen",
 	"LBO_Convenanten",
 	"LBO_Downside_Convenanten",
+	"LBO_Screening_Convenanten",
+	"LBO_Stress_Convenanten",
 	"Red_Flags",
 	"Kwalitatief_LBO_Oordeel",
 }
@@ -107,6 +114,8 @@ PCT_KOLOMMEN = {
 	"Indicatieve_IRR_Pct",
 	"LBO_Downside_IRR_Pct",
 	"LBO_Upside_IRR_Pct",
+	"LBO_Screening_IRR_Pct",
+	"LBO_Stress_IRR_Pct",
 	"LBO_IRR_Exact_Pct",
 	"LBO_Forecast_Groei_Pct",
 	"LBO_EBITDA_Marge_Exit_Pct",
@@ -120,6 +129,8 @@ MULT_KOLOMMEN = {
 	"LBO_Laagste_Rentedekking",
 	"LBO_Hoogste_Leverage",
 	"LBO_Downside_MoIC",
+	"LBO_Screening_MoIC",
+	"LBO_Stress_Laagste_DSCR",
 	"LBO_MoIC_Exact",
 	"Huidige_Net_Debt_to_EBITDA",
 	"LBO_Eind_Net_Debt_to_EBITDA",
@@ -170,6 +181,7 @@ def _voetblok(ws, rij_nr, df):
 		(labels.FOOTER_VERSION, config.MODEL_VERSIE),
 		(labels.FOOTER_GEMINI, ", ".join(modellen) or "-"),
 		(labels.FOOTER_SOURCE, ", ".join(bestanden) or "-"),
+		(labels.FOOTER_RUN, str(df["Run_Manifest"].iloc[0]) if "Run_Manifest" in df else "-"),
 	]
 	for verschuiving, (label, waarde) in enumerate(regels):
 		ws.cell(row=rij_nr + verschuiving, column=1, value=label).font = stijl.lettertype(vet=True)

@@ -98,7 +98,7 @@ def bouw(tmp_path, cijfers, pack, filings, naam="model.xlsx"):
 def vergelijk_scenario(open_wb, rij, scenario):
 	model = rij["LBO_Scenarios"][scenario]
 	jaren = model["Jaren"][1:]
-	open_wb.scenario(config.LBO_SCENARIOS[scenario]["label"])
+	open_wb.scenario(assumpties.scenario_label(scenario))
 
 	vergelijkingen = {
 		("model", "ebitda"): [jaar["EBITDA"] for jaar in jaren],
@@ -125,7 +125,7 @@ def vergelijk_scenario(open_wb, rij, scenario):
 	assert open_wb.checks() == labels.CHECK_OK, scenario
 
 
-@pytest.mark.parametrize("scenario", assumpties.SCENARIOS)
+@pytest.mark.parametrize("scenario", assumpties.MODEL_SCENARIOS)
 def test_excel_matches_python_per_scenario(excel, tmp_path, rij, filings, scenario):
 	pack, cijfers = rij
 	df_rij, pad, kaart = bouw(tmp_path, cijfers, pack, filings)
@@ -245,7 +245,7 @@ def test_fallback_with_little_history_reconciles(excel, tmp_path, filings):
 	wb.save(pad)
 	open_wb = Open(excel, pad, kaart)
 	try:
-		for scenario in assumpties.SCENARIOS:
+		for scenario in assumpties.MODEL_SCENARIOS:
 			vergelijk_scenario(open_wb, rij, scenario)
 		rationale = open_wb.model.Cells(kaart["rijen"]["model"]["ai_base_prijsgroei"], 10).Value
 		assert rationale == labels.ASSUMPTIONS_FALLBACK_HISTORY
@@ -283,7 +283,7 @@ def test_gross_margin_schema_reconciles(excel, tmp_path, filings):
 	wb.save(pad)
 	open_wb = Open(excel, pad, kaart)
 	try:
-		for scenario in assumpties.SCENARIOS:
+		for scenario in assumpties.MODEL_SCENARIOS:
 			vergelijk_scenario(open_wb, rij, scenario)
 		assert all(waarde in (0, None) for waarde in open_wb.rij("model", "cogs"))
 	finally:

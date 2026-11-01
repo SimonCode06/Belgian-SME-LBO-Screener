@@ -10,6 +10,7 @@ Zet per bedrijf de CSV's van meerdere boekjaren in input_pdfs/. De PDF wordt aan
 bedrijf gekoppeld via de naam: 'Cloudar.pdf' hoort bij 'Cloudar_JR2025.csv' of bij
 de bedrijfsnaam 'Cloudar' in de CSV.
 """
+import argparse
 import hashlib
 import json
 import re
@@ -19,7 +20,7 @@ import time
 from google import genai
 from google.genai import types
 
-from src import config, labels
+from src import assumpties, config, labels
 from src.ai_extraction import (
 	analyseer_tekst,
 	bouw_assumptie_prompt,
@@ -31,6 +32,7 @@ from src.ai_extraction import (
 from src.assumpties import AssumptieAntwoord, pack_uit_antwoord
 from src.calculations import bouw_dataframe
 from src.excel_export import schrijf_overzicht, schrijf_per_bedrijf
+from src.manifest import bouw_manifest, manifest_naam, schrijf_manifest
 from src.nbb_csv import bouw_cijfers, bouw_driver_pack, bouw_meerjaren, groepeer_per_bedrijf, lees_neerlegging
 
 
@@ -74,26 +76,26 @@ def geen_tekst(reden):
 	}
 
 
+def _versies():
+	"""Modellijst, promptversie en schemaversie: bewuste knoppen in config, geen pakketversies."""
+	return f"{','.join(config.MODELLEN)}|prompt={config.PROMPT_VERSIE}|schema={config.SCHEMA_VERSIE}".encode("utf-8")
+
+
 def cache_pad_voor(pdf, cijfers):
 	"""De sleutel volgt de inhoud: een andere PDF, prompt, modellijst of andere cijfers geven een nieuwe analyse."""
-	inhoud = pdf.read_bytes() + ",".join(config.MODELLEN).encode("utf-8") + bouw_prompt(cijfers).encode("utf-8")
+	inhoud = pdf.read_bytes() + _versies() + bouw_prompt(cijfers).encode("utf-8")
 	return config.CACHE_FOLDER / f"tekst_{pdf.stem}_{hashlib.sha256(inhoud).hexdigest()[:16]}.json"
 
 
 def oordeel_cache_pad_voor(rij):
 	"""Andere resultaten, een andere prompt of modellijst geven een nieuwe toelichting."""
-	inhoud = ",".join(config.MODELLEN).encode("utf-8") + bouw_oordeel_prompt(rij).encode("utf-8")
+	inhoud = _versies() + bouw_oordeel_prompt(rij).encode("utf-8")
 	return config.CACHE_FOLDER / f"oordeel_{naam_sleutel(rij['Bedrijfsnaam'])}_{hashlib.sha256(inhoud).hexdigest()[:16]}.json"
 
 
 def assumptie_cache_pad_voor(pdf, driver_pack):
-	"""A different PDF, prompt, schema, model list or driver pack gives new assumptions."""
-	inhoud = (
-		pdf.read_bytes()
-		+ ",".join(config.MODELLEN).encode("utf-8")
-		+ bouw_assumptie_prompt(driver_pack).encode("utf-8")
-		+ json.dumps(AssumptieAntwoord.model_json_schema(), sort_keys=True).encode("utf-8")
-	)
+	"""A different PDF, prompt (version), schema version, model list or driver pack gives new assumptions."""
+	inhoud = pdf.read_bytes() + _versies() + bouw_assumptie_prompt(driver_pack).encode("utf-8")
 	return config.CACHE_FOLDER / f"assumpties_{pdf.stem}_{hashlib.sha256(inhoud).hexdigest()[:16]}.json"
 
 
@@ -108,34 +110,70 @@ def lees_assumptie_cache(pad):
 		return None
 
 
-def haal_assumpties(client, pdf, bedrijf, cijfers, mislukt):
-	"""AI assumptions if the history allows it. Returns (pack, source label, driver pack, model)."""
+def _uit_snapshot(pad, driver_pack, mislukt):
+	"""The fixed assumption set. A broken snapshot is an error to fix, not a reason to call Gemini."""
+	try:
+		antwoord, metadata = assumpties.lees_snapshot(pad)
+	except ValueError as fout:
+		print(f"   -> FOUT in snapshot {pad.name}: {fout}")
+		mislukt.append(f"snapshot {pad.name}")
+		return None, labels.ASSUMPTIONS_FALLBACK_NO_AI, driver_pack, None, None
+	info = assumpties.snapshot_info(pad, metadata)
+	print(f"   -> Assumpties uit snapshot: {pad.name} (status: {info['status']})")
+	return pack_uit_antwoord(antwoord), labels.ASSUMPTIONS_AI, driver_pack, metadata.get("gemini_model"), info
+
+
+def haal_assumpties(client, pdf, bedrijf, cijfers, mislukt, vernieuw=False):
+	"""AI assumptions if the history allows it. Returns (pack, source label, driver pack, model, snapshot info).
+
+	A snapshot in assumpties/ always wins: the same company and year then always get the same
+	assumptions, also without an API key and also after a prompt change. Only with
+	vernieuw=True (python main.py --vernieuw-assumpties) does Gemini make a new set; the old
+	snapshot is then archived, never deleted.
+	"""
 	if cijfers["Driver_Aantal_Jaren"] < config.LBO_MIN_JAREN:
 		print("   -> Assumpties: te weinig historiek, mechanische drivers")
-		return None, labels.ASSUMPTIONS_FALLBACK_HISTORY, None, None
+		return None, labels.ASSUMPTIONS_FALLBACK_HISTORY, None, None, None
 	driver_pack = bouw_driver_pack(bedrijf)
+	snapshot = assumpties.snapshot_pad(cijfers["Ondernemingsnummer"], cijfers["Boekjaar"])
+
+	if snapshot.exists() and not vernieuw:
+		return _uit_snapshot(snapshot, driver_pack, mislukt)
 	if pdf is None:
-		return None, labels.ASSUMPTIONS_FALLBACK_NO_AI, driver_pack, None
+		if snapshot.exists():
+			print("   -> Geen PDF om te vernieuwen: bestaande snapshot blijft")
+			return _uit_snapshot(snapshot, driver_pack, mislukt)
+		return None, labels.ASSUMPTIONS_FALLBACK_NO_AI, driver_pack, None, None
 
 	cache_pad = assumptie_cache_pad_voor(pdf, driver_pack)
-	antwoord = lees_assumptie_cache(cache_pad)
-	if antwoord is not None:
-		print(f"   -> Assumpties uit cache: {pdf.name}")
+	data = None
+	if not vernieuw and lees_assumptie_cache(cache_pad) is not None:
 		data = json.loads(cache_pad.read_text(encoding="utf-8"))
-		return pack_uit_antwoord(antwoord), labels.ASSUMPTIONS_AI, driver_pack, data.get("Gebruikt_Model")
-	if client is None:
-		return None, labels.ASSUMPTIONS_FALLBACK_NO_AI, driver_pack, None
+		print(f"   -> Assumpties uit cache: {pdf.name}")
+	if data is None:
+		if client is None:
+			if snapshot.exists():
+				print("   -> Vernieuwen kan niet zonder Gemini: bestaande snapshot blijft")
+				return _uit_snapshot(snapshot, driver_pack, mislukt)
+			return None, labels.ASSUMPTIONS_FALLBACK_NO_AI, driver_pack, None, None
+		try:
+			data = genereer_assumpties(client, pdf, driver_pack)
+			AssumptieAntwoord.model_validate({k: v for k, v in data.items() if k != "Gebruikt_Model"})
+			cache_pad.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+			print(f"   -> Assumpties gegenereerd ({data['Gebruikt_Model']}): {pdf.name}")
+		except Exception as fout:
+			print(f"   -> FOUT bij de assumpties van {pdf.name}: {fout}")
+			mislukt.append(f"assumpties {pdf.name}")
+			if snapshot.exists():
+				return _uit_snapshot(snapshot, driver_pack, mislukt)
+			return None, labels.ASSUMPTIONS_FALLBACK_NO_AI, driver_pack, None, None
 
-	try:
-		data = genereer_assumpties(client, pdf, driver_pack)
-		cache_pad.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-		print(f"   -> Assumpties gegenereerd ({data['Gebruikt_Model']}): {pdf.name}")
-		antwoord = AssumptieAntwoord.model_validate({k: v for k, v in data.items() if k != "Gebruikt_Model"})
-		return pack_uit_antwoord(antwoord), labels.ASSUMPTIONS_AI, driver_pack, data["Gebruikt_Model"]
-	except Exception as fout:
-		print(f"   -> FOUT bij de assumpties van {pdf.name}: {fout}")
-		mislukt.append(f"assumpties {pdf.name}")
-		return None, labels.ASSUMPTIONS_FALLBACK_NO_AI, driver_pack, None
+	if snapshot.exists():
+		archief = assumpties.archiveer_snapshot(snapshot)
+		print(f"   -> Oude snapshot gearchiveerd: {archief.name}")
+	assumpties.schrijf_snapshot(snapshot, data, pdf, cijfers["Bedrijfsnaam"])
+	print(f"   -> Nieuwe snapshot: {snapshot.name}")
+	return _uit_snapshot(snapshot, driver_pack, mislukt)
 
 
 def lees_cache(pad, sleutels=config.VERWACHTE_SLEUTELS):
@@ -202,7 +240,19 @@ def voeg_oordelen_toe(df, client, mislukt):
 		df.at[index, "Kwalitatief_LBO_Oordeel"] = oordeel["Kwalitatief_LBO_Oordeel"]
 
 
-def main():
+def lees_argumenten(argv=None):
+	parser = argparse.ArgumentParser(description="LBO Feasibility Analyser")
+	parser.add_argument(
+		"--vernieuw-assumpties",
+		action="store_true",
+		help="Laat Gemini nieuwe assumpties maken; de bestaande snapshots in assumpties/ worden gearchiveerd.",
+	)
+	return parser.parse_args(argv)
+
+
+def main(argv=None):
+	argumenten = lees_argumenten(argv)
+	run_naam = manifest_naam()
 	config.INPUT_FOLDER.mkdir(exist_ok=True)
 	config.CACHE_FOLDER.mkdir(exist_ok=True)
 	config.OUTPUT_FOLDER.mkdir(exist_ok=True)
@@ -227,7 +277,7 @@ def main():
 	client = maak_client() if pdf_per_naam else None
 
 	print(f"Start LBO-analyse voor {len(bedrijven)} bedrijf/bedrijven...")
-	resultaten, meerjaren = [], {}
+	resultaten, meerjaren, invoer_per_bedrijf = [], {}, {}
 
 	for i, bedrijf in enumerate(bedrijven, start=1):
 		jaren = ", ".join(neerlegging.boekjaar for neerlegging in bedrijf)
@@ -263,7 +313,14 @@ def main():
 				if client is not None and i < len(bedrijven):
 					time.sleep(config.PAUZE_TUSSEN_PDFS_SEC)
 
-		pack, bron, driver_pack, assumptie_model = haal_assumpties(client, pdf, bedrijf, cijfers, mislukt)
+		pack, bron, driver_pack, assumptie_model, snapshot = haal_assumpties(
+			client, pdf, bedrijf, cijfers, mislukt, vernieuw=argumenten.vernieuw_assumpties
+		)
+		invoer_per_bedrijf[cijfers["Ondernemingsnummer"]] = {
+			"csv": [config.INPUT_FOLDER / neerlegging.bestand for neerlegging in bedrijf],
+			"pdf": pdf,
+			"gemini_model": assumptie_model,
+		}
 		velden = koppel_tekst(cijfers, tekst)
 		if assumptie_model:
 			velden["Gebruikt_Model"] = assumptie_model
@@ -274,6 +331,9 @@ def main():
 				"LBO_Assumpties": pack,
 				"LBO_Assumptie_Bron": bron,
 				"LBO_Driver_Pack": driver_pack,
+				"LBO_Snapshot_Naam": snapshot["naam"] if snapshot else "-",
+				"LBO_Snapshot_Datum": snapshot["datum"] if snapshot else "-",
+				"LBO_Snapshot_Status": snapshot["status"] if snapshot else "-",
 			}
 		)
 
@@ -284,6 +344,7 @@ def main():
 	if resultaten:
 		df = bouw_dataframe(resultaten)
 		voeg_oordelen_toe(df, client, mislukt)
+		df["Run_Manifest"] = run_naam  # in the footer of every workbook
 
 		overzicht_pad = schrijf_overzicht(df)
 		print(f"\nOverzicht opgeslagen als: {overzicht_pad}")
@@ -292,6 +353,11 @@ def main():
 		print(f"Aparte bedrijfsfiches opgeslagen ({len(per_bedrijf_paden)}):")
 		for pad in per_bedrijf_paden:
 			print(f"   - {pad.name}")
+
+		manifest = bouw_manifest(
+			run_naam, df, invoer_per_bedrijf, vars(argumenten), [overzicht_pad, *per_bedrijf_paden], mislukt
+		)
+		print(f"Run-manifest: {schrijf_manifest(manifest)}")
 	else:
 		print("\nEr konden geen resultaten worden verwerkt.")
 

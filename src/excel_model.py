@@ -696,7 +696,7 @@ class Bouwer:
 		self.r["model"]["fractie"] = rij_nr + 3
 		rij_nr += 5
 		self.ai_blokken = {}
-		for scenario in assumpties.SCENARIOS:
+		for scenario in assumpties.MODEL_SCENARIOS:
 			self.ai_blokken[scenario] = rij_nr
 			rij_nr += 1
 			for driver in assumpties.DRIVERS:
@@ -896,6 +896,7 @@ class Bouwer:
 			(labels.FOOTER_VERSION, config.MODEL_VERSIE),
 			(labels.FOOTER_GEMINI, self.rij["Gebruikt_Model"] or "-"),
 			(labels.FOOTER_SOURCE, self.rij["Bronbestand"]),
+			(labels.FOOTER_RUN, self.rij.get("Run_Manifest", "-")),
 		]
 		for verschuiving, (label, waarde) in enumerate(regels):
 			ws.cell(row=rij + verschuiving, column=1, value=label).font = stijl.lettertype(vet=True, grootte=8)
@@ -934,7 +935,7 @@ class Bouwer:
 	def _schrijf_scenariokiezer(self, ws):
 		nr = HOOFD + 1
 		self._sectie(ws, nr, labels.SECTION_SCENARIO, self.kol.overrides)
-		namen = [config.LBO_SCENARIOS[scenario]["label"] for scenario in assumpties.SCENARIOS]
+		namen = [assumpties.scenario_label(scenario) for scenario in assumpties.MODEL_SCENARIOS]
 
 		self._label(ws, self.scenario_rij, labels.SCENARIO_SELECT, vet=True)
 		kiezer = ws.cell(row=self.scenario_rij, column=3, value=namen[0])
@@ -992,8 +993,9 @@ class Bouwer:
 
 	def _schrijf_ai_blokken(self, ws):
 		rm = self.r["model"]
-		for scenario in assumpties.SCENARIOS:
-			naam = config.LBO_SCENARIOS[scenario]["label"]
+		for scenario in assumpties.MODEL_SCENARIOS:
+			naam = assumpties.scenario_label(scenario)
+			rij_ai = labels.ROW_RULE_BASED if assumpties.is_screening(scenario) else labels.ROW_AI
 			kop = self.ai_blokken[scenario]
 			self._sectie(ws, kop, labels.SECTION_AI.format(scenario=naam.upper()), self.kol.overrides)
 			for kolom, tekst in (
@@ -1011,7 +1013,7 @@ class Bouwer:
 				ai_rij = rm[f"ai_{scenario}_{driver.sleutel}"]
 				ov_rij = rm[f"ov_{scenario}_{driver.sleutel}"]
 				used_rij = rm[f"u_{scenario}_{driver.sleutel}"]
-				self._label(ws, ai_rij, labels.ROW_AI.format(driver=driver.label))
+				self._label(ws, ai_rij, rij_ai.format(driver=driver.label))
 				self._label(ws, ov_rij, labels.ROW_OVERRIDE.format(driver=driver.label))
 				self._label(ws, used_rij, labels.ROW_USED.format(driver=driver.label))
 				for jaar, kolom in enumerate(self.kol.jaren):
@@ -1058,11 +1060,11 @@ class Bouwer:
 						self._zet(ws, nr, kolom, self._driver_waarde(driver, waarde), fmt)
 			for kolom in self.kol.jaren:
 				k = get_column_letter(kolom)
-				keuzes = ",".join(f"{k}{rm[f'u_{scenario}_{driver.sleutel}']}" for scenario in assumpties.SCENARIOS)
+				keuzes = ",".join(f"{k}{rm[f'u_{scenario}_{driver.sleutel}']}" for scenario in assumpties.MODEL_SCENARIOS)
 				self._zet(ws, nr, kolom, f"=CHOOSE(Scenario_Index,{keuzes})", fmt)
 			for kolom in (self.kol.rationale, self.kol.source, self.kol.confidence, self.kol.flag):
 				k = get_column_letter(kolom)
-				keuzes = ",".join(f"{k}{rm[f'ai_{scenario}_{driver.sleutel}']}" for scenario in assumpties.SCENARIOS)
+				keuzes = ",".join(f"{k}{rm[f'ai_{scenario}_{driver.sleutel}']}" for scenario in assumpties.MODEL_SCENARIOS)
 				cel = ws.cell(row=nr, column=kolom, value=f'=CHOOSE(Scenario_Index,{keuzes})&""')
 				cel.font = stijl.lettertype(grootte=8)
 			self._grijs(ws, nr)
@@ -1209,6 +1211,16 @@ class Bouwer:
 		self._label(ws, nr, labels.SCENARIO_SELECT)
 		self._zet(ws, nr, 3, "=Scenario", "@")
 		nr += 1
+
+		status_snapshot = rij.get("LBO_Snapshot_Status", "-")
+		for label, waarde in (
+			(labels.SNAPSHOT_LABEL, rij.get("LBO_Snapshot_Naam", "-")),
+			(labels.SNAPSHOT_DATE, rij.get("LBO_Snapshot_Datum", "-")),
+			(labels.SNAPSHOT_STATUS, labels.SNAPSHOT_STATUS_LABELS.get(status_snapshot, status_snapshot)),
+		):
+			self._label(ws, nr, label)
+			ws.cell(row=nr, column=3, value=waarde or "-").font = stijl.lettertype()
+			nr += 1
 		ws.cell(
 			row=nr, column=1,
 			value=labels.SUBTITLE_SUMMARY.format(
@@ -1276,13 +1288,14 @@ class Bouwer:
 
 		self._sectie(ws, nr, labels.SECTION_SCENARIOS)
 		nr += 1
-		for index, scenario in enumerate(assumpties.SCENARIOS):
-			cel = ws.cell(row=nr, column=3 + index, value=config.LBO_SCENARIOS[scenario]["label"])
+		for index, scenario in enumerate(assumpties.MODEL_SCENARIOS):
+			cel = ws.cell(row=nr, column=3 + index, value=assumpties.scenario_label(scenario))
 			cel.font = stijl.lettertype(vet=True)
-			cel.alignment = Alignment(horizontal="center")
-		ws.cell(row=nr, column=7, value=labels.SCENARIO_NOTE).font = stijl.lettertype(cursief=True, grootte=8)
+			cel.alignment = Alignment(horizontal="center", wrap_text=True)
+		notitie = 3 + len(assumpties.MODEL_SCENARIOS)
+		ws.cell(row=nr, column=notitie, value=labels.SCENARIO_NOTE).font = stijl.lettertype(cursief=True, grootte=8)
 		nr += 1
-		modellen = [rij["LBO_Scenarios"][scenario] for scenario in assumpties.SCENARIOS]
+		modellen = [rij["LBO_Scenarios"][scenario] for scenario in assumpties.MODEL_SCENARIOS]
 		metrieken = [
 			("x_irr", lambda m: m["LBO_IRR_Exact_Pct"] / 100, stijl.FMT_PCT),
 			("x_moic", lambda m: m["LBO_MoIC_Exact"], stijl.FMT_MULT_2),

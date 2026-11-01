@@ -212,6 +212,15 @@ def bouw_dataframe(resultaten):
         index=df.index,
         dtype=object,
     )
+    # The screening case is always added: it never depends on Gemini
+    df["LBO_Assumpties"] = pd.Series(
+        [{**r["LBO_Assumpties"], **assumpties.screening_assumpties(r)} for _, r in df.iterrows()],
+        index=df.index,
+        dtype=object,
+    )
+    for kol in ("LBO_Snapshot_Naam", "LBO_Snapshot_Datum", "LBO_Snapshot_Status"):
+        if kol not in df:
+            df[kol] = "-"
     df["LBO_Assumptie_Vlaggen"] = pd.Series(
         [
             assumpties.controleer(
@@ -268,6 +277,14 @@ def bouw_dataframe(resultaten):
     df["LBO_Downside_MoIC"] = [m["downside"]["Indicatieve_MoIC"] for m in scenario_modellen]
     df["LBO_Downside_Convenanten"] = [m["downside"]["LBO_Convenanten"] for m in scenario_modellen]
     df["LBO_Upside_IRR_Pct"] = [m["upside"]["Indicatieve_IRR_Pct"] for m in scenario_modellen]
+    # Screening case: rule-based and identical for every run, shown next to the analyst case.
+    # The assessment does not use it yet (phase 5 of the roadmap).
+    df["LBO_Screening_IRR_Pct"] = [m["screening_base"]["Indicatieve_IRR_Pct"] for m in scenario_modellen]
+    df["LBO_Screening_MoIC"] = [m["screening_base"]["Indicatieve_MoIC"] for m in scenario_modellen]
+    df["LBO_Screening_Convenanten"] = [m["screening_base"]["LBO_Convenanten"] for m in scenario_modellen]
+    df["LBO_Stress_IRR_Pct"] = [m["screening_stress"]["Indicatieve_IRR_Pct"] for m in scenario_modellen]
+    df["LBO_Stress_Laagste_DSCR"] = [m["screening_stress"]["LBO_Laagste_DSCR"] for m in scenario_modellen]
+    df["LBO_Stress_Convenanten"] = [m["screening_stress"]["LBO_Convenanten"] for m in scenario_modellen]
     df["LBO_IRR_Exact_Pct"] = [m["LBO_IRR_Exact_Pct"] for m in lbo_modellen]
     df["LBO_MoIC_Exact"] = [m["LBO_MoIC_Exact"] for m in lbo_modellen]
     df["LBO_Forecast_Groei_Pct"] = [
@@ -483,10 +500,19 @@ def bouw_dataframe(resultaten):
         "LBO_Downside_MoIC",
         "LBO_Downside_Convenanten",
         "LBO_Upside_IRR_Pct",
+        "LBO_Screening_IRR_Pct",
+        "LBO_Screening_MoIC",
+        "LBO_Screening_Convenanten",
+        "LBO_Stress_IRR_Pct",
+        "LBO_Stress_Laagste_DSCR",
+        "LBO_Stress_Convenanten",
         "LBO_IRR_Exact_Pct",
         "LBO_MoIC_Exact",
         "LBO_Forecast_Groei_Pct",
         "LBO_Assumptie_Bron",
+        "LBO_Snapshot_Naam",
+        "LBO_Snapshot_Datum",
+        "LBO_Snapshot_Status",
         "LBO_Assumpties",
         "LBO_Assumptie_Vlaggen",
         "LBO_Driver_Pack",

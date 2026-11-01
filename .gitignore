@@ -10,3 +10,4 @@ __pycache__/
 tests/baseline_local/
 .coverage
 htmlcov/
+assumpties/

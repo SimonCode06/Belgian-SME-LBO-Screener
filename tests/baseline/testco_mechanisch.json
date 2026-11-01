@@ -35,6 +35,22 @@
       "LBO_Laagste_DSCR": 1.25,
       "LBO_Laagste_Rentedekking": 4.79
     },
+    "screening_base": {
+      "Indicatieve_IRR_Pct": 26.7,
+      "Indicatieve_MoIC": 3.26,
+      "LBO_Convenanten": "OK",
+      "LBO_Hoogste_Leverage": 2.14,
+      "LBO_Laagste_DSCR": 1.33,
+      "LBO_Laagste_Rentedekking": 5.1
+    },
+    "screening_stress": {
+      "Indicatieve_IRR_Pct": 21.4,
+      "Indicatieve_MoIC": 2.64,
+      "LBO_Convenanten": "BREACHED: Y1 DSCR 1.05x",
+      "LBO_Hoogste_Leverage": 2.86,
+      "LBO_Laagste_DSCR": 1.05,
+      "LBO_Laagste_Rentedekking": 4.08
+    },
     "upside": {
       "Indicatieve_IRR_Pct": 30.9,
       "Indicatieve_MoIC": 3.84,

@@ -210,6 +210,14 @@ ASSUMPTIONS_AI = "Gemini AI proposal"
 ASSUMPTIONS_FALLBACK_HISTORY = "Historical fallback (insufficient history)"
 ASSUMPTIONS_FALLBACK_NO_AI = "Historical fallback (Gemini not available)"
 ASSUMPTIONS_FALLBACK_NOT_REQUIRED = "Historical fallback (no LBO to calculate)"
+ASSUMPTIONS_SCREENING = "Rule-based (filing)"
+ASSUMPTIONS_STRESS = "Rule-based (filing) with the standard stress: EBITDA {haircuts} below the Screening Base in Y1-Y5"
+ASSUMPTIONS_RULE_BASED = "Filing (rule-based)"
+
+SNAPSHOT_LABEL = "Assumption Snapshot"
+SNAPSHOT_DATE = "Snapshot Date"
+SNAPSHOT_STATUS = "Snapshot Status"
+SNAPSHOT_STATUS_LABELS = {"voorstel": "Proposal (not reviewed)", "goedgekeurd": "Approved by analyst"}
 
 DRIVER_PRICE = "Price Growth"
 DRIVER_VOLUME = "Volume Growth"
@@ -290,18 +298,19 @@ SECTION_COVENANTS = "COVENANTS"
 SECTION_EXIT = "EXIT AND RETURNS"
 SECTION_DEFINITIONS = "NET DEBT DEFINITIONS"
 SECTION_KEY_METRICS = "KEY METRICS (ACTIVE SCENARIO)"
-SECTION_SCENARIOS = "KEY METRICS BY SCENARIO (AI CASE)"
+SECTION_SCENARIOS = "KEY METRICS BY SCENARIO (ANALYST CASE AND SCREENING CASE)"
 SECTION_TREND = "MULTI-YEAR OVERVIEW (ACTIVE SCENARIO)"
 SECTION_TEXT = "RED FLAGS AND QUALITATIVE ASSESSMENT"
 
 ROW_AI = "{driver}: AI Proposal"
+ROW_RULE_BASED = "{driver}: Filing (Rule-Based)"
 ROW_OVERRIDE = "{driver}: Override"
 ROW_USED = "{driver}: Used"
 
 STATUS_LABEL = "LBO Assessment"
 OVERRIDES_ACTIVE = "Overrides active"
 OVERRIDES_NOTE = "The assessment reflects the AI case and does not follow overrides."
-SCENARIO_NOTE = "Python results on the AI assumptions: these do not follow overrides."
+SCENARIO_NOTE = "Python results on the proposed assumptions: these do not follow overrides."
 
 # Row labels of the workbook, by internal row key
 ROW_LABELS = {
@@ -527,11 +536,13 @@ FOOTER_DATE = "Date"
 FOOTER_VERSION = "Model version"
 FOOTER_GEMINI = "Gemini model"
 FOOTER_SOURCE = "Source file"
+FOOTER_RUN = "Run manifest"
 
 GROUP_IDENTIFICATION = "IDENTIFICATION & ASSESSMENT"
 GROUP_TRENDS = "MULTI-YEAR TREND & MARGINS"
 GROUP_BRIDGE = "EV-TO-EQUITY BRIDGE & NWC"
 GROUP_RETURNS = "LBO VALUATION & RETURNS (5Y)"
+GROUP_SCREENING = "SCREENING CASE (RULE-BASED, NOT YET IN THE ASSESSMENT)"
 
 # Column headers of the overview workbook, by internal key
 COLUMN_LABELS = {
@@ -659,6 +670,16 @@ COLUMN_LABELS = {
 	"LBO_Downside_MoIC": "Downside MoIC",
 	"LBO_Downside_Convenanten": "Downside Covenants",
 	"LBO_Upside_IRR_Pct": "Upside IRR",
+	"LBO_Screening_IRR_Pct": "Screening IRR",
+	"LBO_Screening_MoIC": "Screening MoIC",
+	"LBO_Screening_Convenanten": "Screening Covenants",
+	"LBO_Stress_IRR_Pct": "Stress IRR",
+	"LBO_Stress_Laagste_DSCR": "Stress Min. DSCR",
+	"LBO_Stress_Convenanten": "Stress Covenants",
+	"LBO_Snapshot_Naam": "Assumption Snapshot",
+	"LBO_Snapshot_Datum": "Snapshot Date",
+	"LBO_Snapshot_Status": "Snapshot Status",
+	"Run_Manifest": "Run Manifest",
 	"Eigen_Vermogen": "Shareholders' Equity",
 	"Balanstotaal": "Total Assets",
 	"Overgedragen_Resultaat": "Retained Earnings",

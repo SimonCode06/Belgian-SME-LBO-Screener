@@ -14,6 +14,10 @@ BASIS_MAP = Path(__file__).resolve().parent.parent
 INPUT_FOLDER = BASIS_MAP / "input_pdfs"  # NBB-CSV's (cijfers) en NBB-PDF's (tekst)
 CACHE_FOLDER = BASIS_MAP / "cache_json"
 OUTPUT_FOLDER = BASIS_MAP / "output"
+# Vastgezette AI-assumpties per bedrijf en boekjaar. Een bestaande snapshot wordt altijd gebruikt;
+# alleen 'python main.py --vernieuw-assumpties' vraagt een nieuwe set aan Gemini.
+SNAPSHOT_FOLDER = BASIS_MAP / "assumpties"
+RUNS_FOLDER = OUTPUT_FOLDER / "runs"
 
 MODEL_VERSIE = "2.0"
 
@@ -75,6 +79,16 @@ LBO_SCENARIOS = {
 	"downside": {"label": "Downside", "prijsgroei": 0.01, "volume_delta": -0.02, "indexering": 0.025, "inkoop_delta": 0.0025},
 	"upside": {"label": "Upside", "prijsgroei": 0.025, "volume_delta": 0.01, "indexering": 0.02, "inkoop_delta": -0.0025},
 }
+# De drie scenario's hierboven vormen de 'Analyst case' (AI-voorstel of mechanische terugval).
+# De screening case staat daar los van en wordt altijd berekend, ook als er AI-assumpties zijn:
+# - screening_base: de mechanische drivers uit de jaarrekening (scenario 'base' hierboven)
+# - screening_stress: dezelfde drivers met een vaste EBITDA-daling per jaar tegenover screening_base.
+#   Zo krijgt elk bedrijf exact dezelfde stresstest en zijn bedrijven onderling vergelijkbaar.
+LBO_SCREENING_SCENARIOS = {
+	"screening_base": {"label": "Screening Base"},
+	"screening_stress": {"label": "Screening Stress"},
+}
+LBO_STRESS_EBITDA_HAIRCUT = [0.20, 0.20, 0.15, 0.10, 0.10]  # EBITDA-daling in jaar 1 t/m 5
 
 # Zachte vlaggen op de AI-assumpties: ze waarschuwen en corrigeren nooit
 LBO_VLAG_OMZETGROEI = (-25.0, 25.0)   # Omzetgroei per jaar, in procentpunt
@@ -152,6 +166,12 @@ REQUEST_TIMEOUT_MS = 180_000  # 3 minuten per request
 PAUZE_TUSSEN_PDFS_SEC = 4
 INLINE_LIMIET_BYTES = 15 * 1024 * 1024  # groter => via Files API uploaden
 RETRYABLE_CODES = {429, 500, 502, 503, 504}
+
+# Versies van de AI-input, onderdeel van elke cachesleutel. Verhoog PROMPT_VERSIE bij elke bewuste
+# wijziging van een prompt en SCHEMA_VERSIE bij elke wijziging van het antwoordschema
+# (assumpties.AssumptieAntwoord). Een pakketupdate (bv. pydantic) verandert de sleutel zo nooit.
+PROMPT_VERSIE = "2026-11-a"
+SCHEMA_VERSIE = 1
 
 SYSTEEM_PROMPT = """
 You are an experienced Belgian M&A and Private Equity analyst. You receive an NBB

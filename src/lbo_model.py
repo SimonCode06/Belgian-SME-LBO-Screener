@@ -278,10 +278,9 @@ def bereken_lbo(rij, scenario="base"):
 	if ebitda_0 <= 0:
 		return _geen_lbo(labels.not_available(labels.REASON_NO_EBITDA))
 
-	if assumpties.heeft_lege_waarden(rij["LBO_Assumpties"]):
-		return _geen_lbo(labels.not_available(labels.REASON_INSUFFICIENT_DATA))
-
 	drivers = rij["LBO_Assumpties"][scenario]
+	if assumpties.heeft_lege_waarden({scenario: drivers}):
+		return _geen_lbo(labels.not_available(labels.REASON_INSUFFICIENT_DATA))
 
 	def driver(sleutel, jaar):
 		"""De aanname ongewijzigd: geen begrenzing en geen terugval."""
@@ -662,5 +661,5 @@ def bereken_lbo(rij, scenario="base"):
 
 
 def bereken_scenarios(rij):
-	"""Rekent elk scenario één keer door. De rest van het project toont dit resultaat."""
-	return {scenario: bereken_lbo(rij, scenario) for scenario in config.LBO_SCENARIOS}
+	"""Rekent elk scenario één keer door (analyst case + screening case). De rest van het project toont dit resultaat."""
+	return {scenario: bereken_lbo(rij, scenario) for scenario in assumpties.MODEL_SCENARIOS if scenario in rij["LBO_Assumpties"]}

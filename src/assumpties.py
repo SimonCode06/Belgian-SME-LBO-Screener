@@ -7,7 +7,11 @@ as a fallback, so the model and the Excel always read one format.
 
 Percentages are in percentage points (5.0 = 5%), days in days, elasticity as a factor.
 """
+import hashlib
+import json
 import math
+import re
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
@@ -15,7 +19,17 @@ from pydantic import BaseModel, Field, model_validator
 from . import config, labels
 
 JAREN = config.LBO_HOLDING_PERIOD_YEARS
-SCENARIOS = tuple(config.LBO_SCENARIOS)
+SCENARIOS = tuple(config.LBO_SCENARIOS)  # the analyst case: what Gemini proposes
+SCREENING_SCENARIOS = tuple(config.LBO_SCREENING_SCENARIOS)  # rule-based, always calculated
+MODEL_SCENARIOS = SCENARIOS + SCREENING_SCENARIOS
+
+
+def scenario_label(scenario):
+	return {**config.LBO_SCENARIOS, **config.LBO_SCREENING_SCENARIOS}[scenario]["label"]
+
+
+def is_screening(scenario):
+	return scenario in config.LBO_SCREENING_SCENARIOS
 
 
 class Driver:
@@ -194,6 +208,27 @@ def mechanische_assumpties(rij, bron):
 	return pack
 
 
+def screening_assumpties(rij):
+	"""The screening case: the drivers from the filing, and the same drivers under the standard stress.
+
+	The stress raises Other Operating Expenses in year t by haircut_t x |EBITDA margin_t| of the
+	screening base. Revenue, purchases, personnel and working capital stay the same, so EBITDA is
+	exactly (1 - haircut) x the screening base EBITDA (and never improves when it is negative).
+	"""
+	base = mechanische_assumpties(rij, labels.ASSUMPTIONS_SCREENING)["base"]
+	_, marges = impliciete_groei_en_marge(base, float(rij["Omzet_of_Brutomarge"]), float(rij["Personeelskosten"]))
+	stress = {sleutel: {**voorstel, "waarden": list(voorstel["waarden"]), "vlaggen": []} for sleutel, voorstel in base.items()}
+	stress["overige_kosten_pct"]["waarden"] = [
+		waarde + haircut * abs(marge)
+		for waarde, haircut, marge in zip(base["overige_kosten_pct"]["waarden"], config.LBO_STRESS_EBITDA_HAIRCUT, marges)
+	]
+	tekst = labels.ASSUMPTIONS_STRESS.format(
+		haircuts=" / ".join(f"{haircut * 100:.0f}%" for haircut in config.LBO_STRESS_EBITDA_HAIRCUT)
+	)
+	stress["overige_kosten_pct"]["rationale"] = tekst
+	return {"screening_base": base, "screening_stress": stress}
+
+
 def heeft_lege_waarden(pack):
 	return any(
 		math.isnan(waarde)
@@ -306,3 +341,66 @@ def controleer(pack, pack_jaren, omzet_0, personeel_0):
 			for vlag in pack[scenario][driver.sleutel]["vlaggen"]:
 				regels.append(f"{label} / {driver.label}: {vlag}")
 	return regels
+
+
+# ============================================================================
+# Snapshots: one fixed AI assumption set per company and fiscal year
+# ============================================================================
+SNAPSHOT_VOORSTEL = "voorstel"        # written by the tool, not yet reviewed
+SNAPSHOT_GOEDGEKEURD = "goedgekeurd"  # set by hand by the analyst after review
+
+
+def snapshot_pad(ondernemingsnummer, boekjaar):
+	"""assumpties/<enterprise number>_FY<year>.json; the number without dots."""
+	nummer = re.sub(r"\D", "", str(ondernemingsnummer))
+	return config.SNAPSHOT_FOLDER / f"{nummer}_FY{boekjaar}.json"
+
+
+def bestand_hash(pad):
+	return hashlib.sha256(pad.read_bytes()).hexdigest() if pad is not None else None
+
+
+def schrijf_snapshot(pad, data, pdf, bedrijf):
+	"""Stores a validated Gemini response with the metadata needed to explain it later."""
+	pad.parent.mkdir(parents=True, exist_ok=True)
+	inhoud = {
+		"metadata": {
+			"bedrijf": bedrijf,
+			"status": SNAPSHOT_VOORSTEL,
+			"datum": datetime.now().isoformat(timespec="seconds"),
+			"gemini_model": data.get("Gebruikt_Model"),
+			"prompt_versie": config.PROMPT_VERSIE,
+			"schema_versie": config.SCHEMA_VERSIE,
+			"pdf_bestand": pdf.name if pdf is not None else None,
+			"pdf_sha256": bestand_hash(pdf),
+		},
+		"assumpties": {"regels": data["regels"]},
+	}
+	pad.write_text(json.dumps(inhoud, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def lees_snapshot(pad):
+	"""Returns (validated response, metadata). A broken file raises ValueError: it is never overwritten silently."""
+	try:
+		inhoud = json.loads(pad.read_text(encoding="utf-8"))
+		antwoord = AssumptieAntwoord.model_validate(inhoud["assumpties"])
+		metadata = dict(inhoud.get("metadata") or {})
+	except (OSError, ValueError, KeyError, TypeError) as fout:
+		raise ValueError(f"{pad.name}: {fout}") from None
+	return antwoord, metadata
+
+
+def archiveer_snapshot(pad):
+	"""Renames the current snapshot to ..._<date>.json, so no reviewed set is ever lost."""
+	doel = pad.with_name(f"{pad.stem}_{datetime.now().strftime('%Y%m%d_%H%M%S')}{pad.suffix}")
+	pad.rename(doel)
+	return doel
+
+
+def snapshot_info(pad, metadata):
+	"""What the Excel and the run manifest show about the snapshot."""
+	return {
+		"naam": pad.name,
+		"datum": str(metadata.get("datum", "")),
+		"status": str(metadata.get("status", SNAPSHOT_VOORSTEL)),
+	}
