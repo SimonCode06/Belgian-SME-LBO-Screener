@@ -609,6 +609,7 @@ STRUCTUUR_RIJEN = (
 INGEKLAPTE_GROEPEN = ("settings",)  # technical switches: grouped and collapsed by default
 
 
+RISICO_BREEDTES = (11, 22, 14, 10, 12, 120)  # severity, category, source, in score, page/effect, text
 GRAFIEK_RIJEN = 18  # room for the value creation chart below the bridge
 VC_RIJEN = ("vc_start", "vc_growth", "vc_multiple", "vc_debt", "vc_fees", "vc_div", "vc_end", "vc_check")
 
@@ -1861,15 +1862,93 @@ class Bouwer:
 		return nr + 1
 
 	def schrijf_risico(self):
-		"""Risks & Adjustments: the long text blocks that do not fit on the one-pager."""
+		"""Risks & Adjustments: every red flag (filterable), the EBITDA ledger as read and the text blocks."""
 		ws = self.ws_risico
-		self._kop(ws, labels.TITLE_RISKS, "risico", jaren=False)
-		nr = self._schrijf_teksten(ws, 4)
+		laatste = len(RISICO_BREEDTES)
+		for kolom, breedte in enumerate(RISICO_BREEDTES, start=1):
+			ws.column_dimensions[get_column_letter(kolom)].width = breedte
+			stijl.sectiekop(ws.cell(row=1, column=kolom))
+		ws.cell(row=1, column=1, value=f"{labels.TITLE_RISKS}: {self.rij['Bedrijfsnaam']}   ({labels.UNITS_NOTE})")
+		ws.cell(row=2, column=1, value=labels.RISKS_NOTE).font = stijl.lettertype(cursief=True, grootte=8)
+		ws.sheet_view.showGridLines = False
+		ws.freeze_panes = "A3"
+
+		# --- Red flags, most severe first, with a filter
+		nr = 4
+		self._sectie(ws, nr, labels.SECTION_ALL_FLAGS, laatste)
+		nr += 1
+		kop = nr
+		self._tabelkop(ws, nr, labels.FLAG_HEADERS)
+		vlaggen = list(self.rij.get("Red_Flag_Lijst") or [])
+		for vlag in vlaggen:
+			nr += 1
+			waarden = (
+				labels.SEVERITIES.get(vlag["ernst"], vlag["ernst"]),
+				labels.FLAG_CATEGORIES.get(vlag["categorie"], vlag["categorie"]),
+				vlag["bron"],
+				labels.YES if vlag.get("telt", True) else labels.NO,
+				vlag.get("pagina") or "-",
+				vlag["tekst"],
+			)
+			for kolom, waarde in enumerate(waarden, start=1):
+				cel = ws.cell(row=nr, column=kolom, value=waarde)
+				cel.font = stijl.lettertype(
+					stijl.ERNST_KLEUR.get(vlag["ernst"], stijl.ZWART) if kolom == 1 else stijl.ZWART, vet=kolom == 1, grootte=9
+				)
+				cel.alignment = Alignment(vertical="top", wrap_text=kolom == laatste, horizontal="left" if kolom in (2, 6) else "center")
+				cel.border = stijl.Border(bottom=stijl.DUN_GRIJS)
+			ws.row_dimensions[nr].height = max(13, 12 * (len(str(vlag["tekst"])) // 150 + 1))
+		if not vlaggen:
+			nr += 1
+			ws.cell(row=nr, column=1, value=labels.NO_RISKS).font = stijl.lettertype(cursief=True)
+		ws.auto_filter.ref = f"A{kop}:{get_column_letter(laatste)}{max(nr, kop + 1)}"
+		nr += 2
+
+		# --- EBITDA ledger, read from the inputs tab (the switches stay there)
+		self._sectie(ws, nr, labels.SECTION_LEDGER_READ, laatste)
+		nr += 1
+		self._tabelkop(ws, nr, labels.LEDGER_READ_HEADERS)
+		for index, item in enumerate(self.ledger):
+			nr += 1
+			bron = self.ledger_eerste + index
+			ws.cell(row=nr, column=1, value=item["id"]).font = stijl.lettertype(vet=True, grootte=9)
+			ws.cell(row=nr, column=2, value=labels.ADJUSTMENT_TYPES.get(item["categorie"], item["categorie"])).font = stijl.lettertype(grootte=9)
+			self._zet(ws, nr, 3, f"={ZIJDE_INP}C{bron}", stijl.FMT_BEDRAG)
+			self._zet(ws, nr, 4, f"={ZIJDE_INP}F{bron}", "0").alignment = Alignment(horizontal="center")
+			self._zet(ws, nr, 5, f"={ZIJDE_INP}G{bron}", stijl.FMT_BEDRAG)
+			tekst = (
+				f"{item.get('omschrijving', '')} | {item.get('bron', '')} | p. {item.get('pagina') or '-'} | "
+				f"quote {item.get('citaat_status', '')}"
+			)
+			cel = ws.cell(row=nr, column=6, value=tekst)
+			cel.font = stijl.lettertype(grootte=9)
+			cel.alignment = Alignment(wrap_text=True, vertical="top")
+		if not self.ledger:
+			nr += 1
+			ws.cell(row=nr, column=1, value=labels.LEDGER_EMPTY).font = stijl.lettertype(cursief=True)
+		nr += 1
+		ws.cell(row=nr, column=1, value=labels.LEDGER_TOTAL).font = stijl.lettertype(vet=True)
+		self._zet(ws, nr, 5, "=Ledger_Total", stijl.FMT_BEDRAG, vet=True)
+		for kolom in range(1, laatste + 1):
+			ws.cell(row=nr, column=kolom).border = stijl.RAND_SUBTOTAAL
+		nr += 2
+
+		# --- Text blocks: ownership, business model, auditor, normalisations, off-balance, covenants, definitions
+		nr = self._schrijf_teksten(ws, nr, tekst_kolom=3, tot=laatste, label_tot=2, overslaan=("Red_Flags",))
 		self._voet(ws, nr + 1)
 
-	def _schrijf_teksten(self, ws, nr):
+	def _tabelkop(self, ws, nr, koppen):
+		for kolom, tekst in enumerate(koppen, start=1):
+			cel = ws.cell(row=nr, column=kolom, value=tekst)
+			cel.font = stijl.lettertype(vet=True, grootte=9)
+			cel.alignment = Alignment(horizontal="left" if kolom in (2, len(koppen)) else "center", vertical="center")
+			cel.border = stijl.Border(bottom=stijl.DUN)
+			cel.fill = stijl.VUL_ACTUAL
+
+	def _schrijf_teksten(self, ws, nr, tekst_kolom=3, tot=None, label_tot=None, overslaan=()):
 		rij = self.rij
-		self._sectie(ws, nr, labels.SECTION_TEXT)
+		tot = tot or self.kol.laatste_jaar
+		self._sectie(ws, nr, labels.SECTION_TEXT, tot)
 		nr += 1
 		thesis = "\n".join(f"\u2022 {punt}" for punt in (rij.get("AI_Investment_Thesis") or []))
 		vragen = "\n".join(
@@ -1877,29 +1956,36 @@ class Bouwer:
 			for index, vraag in enumerate(rij.get("AI_DD_Vragen") or [], start=1)
 		)
 		blokken = [
-			(labels.COLUMN_LABELS["Eigendom"], rij.get("Eigendom", "")),
-			(labels.COLUMN_LABELS["AI_Business_Model"], rij.get("AI_Business_Model", "")),
-			(labels.COLUMN_LABELS["AI_Investment_Thesis"], thesis),
-			(labels.COLUMN_LABELS["AI_DD_Vragen"], vragen),
-			(labels.COLUMN_LABELS["Commissaris_Oordeel"], rij.get("Commissaris_Oordeel", "")),
-			(labels.COLUMN_LABELS["Normalisatie_Toelichting"], rij.get("Normalisatie_Toelichting", "")),
-			(labels.COLUMN_LABELS["Normalisatie_Voorstellen"], rij.get("Normalisatie_Voorstellen", "")),
-			(labels.COLUMN_LABELS["Buitenbalans_Verplichtingen"], rij.get("Buitenbalans_Verplichtingen", "")),
-			(labels.COLUMN_LABELS["LBO_Convenanten"], rij.get("LBO_Convenanten", "")),
-			(labels.COLUMN_LABELS["LBO_Downside_Convenanten"], rij.get("LBO_Downside_Convenanten", "")),
-			(labels.COLUMN_LABELS["Red_Flags"], rij.get("Red_Flags", "")),
-			(labels.COLUMN_LABELS["Kwalitatief_LBO_Oordeel"], rij.get("Kwalitatief_LBO_Oordeel", "")),
+			(sleutel, tekst) for sleutel, tekst in (
+			("Eigendom", rij.get("Eigendom", "")),
+			("AI_Business_Model", rij.get("AI_Business_Model", "")),
+			("AI_Investment_Thesis", thesis),
+			("AI_DD_Vragen", vragen),
+			("Commissaris_Oordeel", rij.get("Commissaris_Oordeel", "")),
+			("Normalisatie_Toelichting", rij.get("Normalisatie_Toelichting", "")),
+			("Normalisatie_Voorstellen", rij.get("Normalisatie_Voorstellen", "")),
+			("Buitenbalans_Verplichtingen", rij.get("Buitenbalans_Verplichtingen", "")),
+			("LBO_Convenanten", rij.get("LBO_Convenanten", "")),
+			("LBO_Downside_Convenanten", rij.get("LBO_Downside_Convenanten", "")),
+			("Red_Flags", rij.get("Red_Flags", "")),
+			("Kwalitatief_LBO_Oordeel", rij.get("Kwalitatief_LBO_Oordeel", "")),
+			) if sleutel not in overslaan
 		]
+		blokken = [(labels.COLUMN_LABELS[sleutel], tekst) for sleutel, tekst in blokken]
 		for doel, definitie in config.NET_DEBT_DEFINITIES.items():
 			blokken.append((f"{labels.SECTION_DEFINITIONS.title()}: {definitie['label']}", net_debt_formule(doel)))
-		breedte_tekens = 13 * len(self.kol.alle) * 1.15
+		breedte_tekens = sum(
+			(ws.column_dimensions[get_column_letter(kolom)].width or 13) for kolom in range(tekst_kolom, tot + 1)
+		) * 1.15
 		for label, tekst in blokken:
 			tekst = str(tekst or "").strip() or "-"
 			cel = ws.cell(row=nr, column=1, value=label)
 			cel.font = stijl.lettertype(vet=True)
 			cel.alignment = Alignment(vertical="top", wrap_text=True)
-			ws.merge_cells(start_row=nr, start_column=3, end_row=nr, end_column=self.kol.laatste_jaar)
-			cel = ws.cell(row=nr, column=3, value=tekst)
+			if label_tot:
+				ws.merge_cells(start_row=nr, start_column=1, end_row=nr, end_column=label_tot)
+			ws.merge_cells(start_row=nr, start_column=tekst_kolom, end_row=nr, end_column=tot)
+			cel = ws.cell(row=nr, column=tekst_kolom, value=tekst)
 			cel.font = stijl.lettertype()
 			cel.alignment = Alignment(vertical="top", wrap_text=True)
 			regels = sum(max(1, int(len(deel) / breedte_tekens) + 1) for deel in tekst.split("\n"))

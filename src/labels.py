@@ -442,6 +442,11 @@ SCENARIO_NOTE = "Python results on the proposed assumptions: these do not follow
 # Executive Summary (IC one-pager)
 TAB_RISKS = "Risks & Adjustments"
 TITLE_RISKS = "RISKS & ADJUSTMENTS"
+RISKS_NOTE = "Every red flag, most severe first (filter with the arrows). Analyst-case flags are shown but never count in the score."
+SECTION_ALL_FLAGS = "RED FLAGS"
+FLAG_HEADERS = ("Severity", "Category", "Source", "In Score", "Page", "Flag")
+SECTION_LEDGER_READ = "EBITDA ADJUSTMENTS (LEDGER): SWITCH ITEMS ON THE INPUTS & ASSUMPTIONS TAB"
+LEDGER_READ_HEADERS = ("ID", "Type", "Amount (EUR k)", "Approved", "EBITDA Effect", "Description | Source | Page | Quote Status")
 SECTION_VERDICT = "SCREENING VERDICT (FILING AND SCREENING CASE)"
 ACTIVE_CASE = "Active Case Check (Live)"
 ACTIVE_WORKS = "WORKS"
