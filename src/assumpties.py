@@ -176,6 +176,10 @@ def mechanische_assumpties(rij, bron):
 		else float("nan")
 	)
 
+	# Approved ledger items are lasting: they lower the target cost ratio as well as the start
+	ledger = float(rij.get("Ledger_EBITDA", 0.0) or 0.0)
+	ledger_pct = ledger / omzet_0 * 100 if omzet_0 > 0 else 0.0
+
 	pack = {}
 	for scenario, aannames in config.LBO_SCENARIOS.items():
 		volume = (1 + groei) / (1 + config.LBO_SCENARIOS["base"]["prijsgroei"]) - 1 + aannames["volume_delta"]
@@ -190,7 +194,7 @@ def mechanische_assumpties(rij, bron):
 				for jaar in range(1, JAREN + 1)
 			],
 			"overige_kosten_pct": [
-				_glide(overige_start, rij["Driver_Overige_Kosten_Pct"], jaar) for jaar in range(1, JAREN + 1)
+				_glide(overige_start, rij["Driver_Overige_Kosten_Pct"] - ledger_pct, jaar) for jaar in range(1, JAREN + 1)
 			],
 			"da_pct": [rij["Driver_DA_Pct_Vaste_Activa"]] * JAREN,
 			"capex_pct": [rij["Driver_Capex_Pct"]] * JAREN,
@@ -231,6 +235,19 @@ def screening_assumpties(rij):
 	)
 	stress["overige_kosten_pct"]["rationale"] = tekst
 	return {"screening_base": base, "screening_stress": stress}
+
+
+def met_ledger(pack, ledger_ebitda, omzet_0):
+	"""The AI pack with Other Opex lowered by the approved ledger adjustments (in pp of revenue). A copy."""
+	if not ledger_ebitda or not omzet_0 or omzet_0 <= 0:
+		return pack
+	verschil = ledger_ebitda / omzet_0 * 100
+	nieuw = {scenario: {sleutel: dict(voorstel) for sleutel, voorstel in drivers.items()} for scenario, drivers in pack.items()}
+	for scenario in SCENARIOS:
+		voorstel = nieuw[scenario]["overige_kosten_pct"]
+		voorstel["waarden"] = [waarde - verschil for waarde in voorstel["waarden"]]
+		voorstel["vlaggen"] = [*voorstel["vlaggen"], labels.ASSUMPTION_LEDGER.format(pp=verschil)]
+	return nieuw
 
 
 def heeft_lege_waarden(pack):

@@ -12,7 +12,7 @@ naar de equity value voor de verkoper en naar de bediening van de nieuwe schuld.
 """
 import pandas as pd
 
-from . import assumpties, config, labels
+from . import assumpties, config, labels, normalisaties
 from .lbo_model import bereken_scenarios, kies_multiples, net_debt
 
 NIET_BESCHIKBAAR = float("nan")  # verschijnt als lege cel in Excel, niet als 0%
@@ -123,7 +123,13 @@ def bouw_dataframe(resultaten):
         + df["Afschrijvingen_Vorig_Jaar"]
         + df["Voorzieningen_Mutatie_Vorig_Jaar"]
     )
-    df["Genormaliseerde_EBITDA"] = df["Gerapporteerde_EBITDA"] + df["Normalisatie_Bedrag"]
+    # Adjustment ledger: alleen goedgekeurde items met een geverifieerd bedrag (zie normalisaties.py)
+    if "LBO_Adjustments" not in df:
+        df["LBO_Adjustments"] = pd.Series([[] for _ in range(len(df))], index=df.index, dtype=object)
+    df["Ledger_EBITDA"] = [
+        normalisaties.totaal(items, maanden) for items, maanden in zip(df["LBO_Adjustments"], df["Boekjaar_Maanden"])
+    ]
+    df["Genormaliseerde_EBITDA"] = df["Gerapporteerde_EBITDA"] + df["Normalisatie_Bedrag"] + df["Ledger_EBITDA"]
 
     # Fase 3: Meerjarentrends (groei en margestabiliteit)
     df["Omzetgroei_Pct"] = df.apply(
@@ -218,6 +224,18 @@ def bouw_dataframe(resultaten):
         [
             r["LBO_Assumpties"] if r["LBO_Assumpties"] is not None
             else assumpties.mechanische_assumpties(r, r["LBO_Assumptie_Bron"])
+            for _, r in df.iterrows()
+        ],
+        index=df.index,
+        dtype=object,
+    )
+    # Approved ledger adjustments are lasting cost savings: the AI scenarios get the same lower cost ratio
+    # (the mechanical drivers already start from the adjusted EBITDA)
+    df["LBO_Assumpties"] = pd.Series(
+        [
+            assumpties.met_ledger(r["LBO_Assumpties"], r["Ledger_EBITDA"], r["Omzet_of_Brutomarge"])
+            if r["LBO_Assumptie_Bron"] == labels.ASSUMPTIONS_AI
+            else r["LBO_Assumpties"]
             for _, r in df.iterrows()
         ],
         index=df.index,
@@ -423,6 +441,7 @@ def bouw_dataframe(resultaten):
         "Personeelskosten",
         "VTE",
         "Normalisatie_Bedrag",
+        "Ledger_EBITDA",
         "Genormaliseerde_EBITDA",
         "EBITDA_Marge_Op_Omzet_Vorig_Jaar_Pct",
         "EBITDA_Marge_Op_Omzet_Pct",
@@ -555,6 +574,7 @@ def bouw_dataframe(resultaten):
         "Kwalitatief_LBO_Oordeel",
         "AI_Business_Model",
         "AI_Normalisaties",
+        "LBO_Adjustments",
         "AI_Red_Flags",
         "AI_Eigendom",
         "AI_Buitenbalans",

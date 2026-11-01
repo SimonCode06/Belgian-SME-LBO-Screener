@@ -138,3 +138,112 @@ def test_stretched_payables_lower_the_price_for_the_seller_not_the_sponsor_equit
 def test_nwc_peg_can_be_switched_off(filings, monkeypatch):
 	monkeypatch.setattr(config, "NWC_PEG_TOEPASSEN", False)
 	assert bouw_cijfers(met_gerekte_leveranciers(filings))["NWC_Aanpassing"] == 0.0
+
+
+# --- 3.4 Adjustment ledger ----------------------------------------------------------------
+
+from src import normalisaties  # noqa: E402
+
+
+def ledger_item(**wijzig):
+	item = {
+		"id": "A1", "categorie": "eenmalig", "omschrijving": "One-off legal cost.", "richting": "+",
+		"bedrag": 100_000.0, "bron": "CSV code 6631", "bedrag_geverifieerd": True, "pagina": 20,
+		"citaat_status": "verified", "market_level": None, "goedgekeurd": True,
+	}
+	item.update(wijzig)
+	return item
+
+
+@pytest.mark.parametrize(
+	"wijzig, effect",
+	[
+		({}, 100_000.0),
+		({"goedgekeurd": False}, 0.0),
+		({"bedrag_geverifieerd": False}, 0.0),  # an AI amount never counts until verified
+		({"richting": "-"}, -100_000.0),
+		({"categorie": "bestuurdersvergoeding", "bedrag": 552_680.0}, 0.0),  # no market level yet
+		({"categorie": "bestuurdersvergoeding", "bedrag": 552_680.0, "market_level": 300_000.0}, 252_680.0),
+	],
+)
+def test_ledger_effect(wijzig, effect):
+	assert normalisaties.totaal([ledger_item(**wijzig)]) == pytest.approx(effect)
+
+
+def test_ledger_is_annualised():
+	assert normalisaties.totaal([ledger_item()], maanden=18) == pytest.approx(100_000.0 * 12 / 18)
+
+
+def test_approved_item_raises_entry_ebitda(cijfers):
+	zonder = bouw_dataframe([cijfers]).iloc[0]
+	met = bouw_dataframe([{**cijfers, "LBO_Adjustments": [ledger_item()]}]).iloc[0]
+	assert met["Ledger_EBITDA"] == 100_000.0
+	assert met["Genormaliseerde_EBITDA"] == pytest.approx(zonder["Genormaliseerde_EBITDA"] + 100_000.0)
+	assert met["LBO_Instap_EV"] == pytest.approx(met["Genormaliseerde_EBITDA"] * met["Instap_Multiple"])
+	assert met["LBO_Balanscheck"] == labels.CHECK_OK
+	# A lasting adjustment: the screening forecast keeps the higher margin
+	jaar5 = [rij["LBO_Scenarios"]["screening_base"]["Jaren"][-1]["EBITDA"] for rij in (zonder, met)]
+	assert jaar5[1] > jaar5[0]
+
+
+def test_unapproved_items_change_nothing(cijfers):
+	zonder = bouw_dataframe([cijfers]).iloc[0]
+	met = bouw_dataframe([{**cijfers, "LBO_Adjustments": [ledger_item(goedgekeurd=False)]}]).iloc[0]
+	assert met["Genormaliseerde_EBITDA"] == zonder["Genormaliseerde_EBITDA"]
+	assert met["LBO_IRR_Exact_Pct"] == zonder["LBO_IRR_Exact_Pct"]
+
+
+def test_ledger_file_is_written_once_and_keeps_the_analyst_decisions(tmp_path, monkeypatch):
+	import json
+
+	monkeypatch.setattr(config, "SNAPSHOT_FOLDER", tmp_path)
+	pad = normalisaties.ledger_pad("0123.456.789", "2024")
+	assert pad.name == "0123456789_FY2024_adjustments.json"
+	ai = [{
+		"categorie": "bestuurdersvergoeding", "omschrijving": "Director pay.", "richting": "+", "bedrag_gebruikt": 552_680.0,
+		"bedrag_bron": "CSV code 9503", "bedrag_geverifieerd": True, "pagina": 34, "citaat_status": "verified",
+	}]
+	items = normalisaties.laad_of_maak(pad, ai, "Testco")
+	assert items[0]["goedgekeurd"] is False and items[0]["market_level"] is None
+	inhoud = json.loads(pad.read_text(encoding="utf-8"))
+	inhoud["items"][0].update(goedgekeurd=True, market_level=250_000.0)
+	pad.write_text(json.dumps(inhoud), encoding="utf-8")
+	opnieuw = normalisaties.laad_of_maak(pad, ai, "Testco")  # a new AI run never overwrites
+	assert opnieuw[0]["goedgekeurd"] is True
+	assert normalisaties.totaal(opnieuw) == pytest.approx(302_680.0)
+
+
+def test_no_ai_items_writes_no_file(tmp_path, monkeypatch):
+	monkeypatch.setattr(config, "SNAPSHOT_FOLDER", tmp_path)
+	assert normalisaties.laad_of_maak(normalisaties.ledger_pad("1", "2024"), [], "X") == []
+	assert not list(tmp_path.iterdir())
+
+
+def test_workbook_has_the_ledger_table_with_switches(cijfers, filings):
+	from src import excel_model
+	from src.nbb_csv import bouw_meerjaren
+
+	rij = bouw_dataframe([{**cijfers, "LBO_Adjustments": [ledger_item(), ledger_item(id="A2", goedgekeurd=False)]}]).iloc[0]
+	wb, kaart = excel_model.bouw_werkboek(rij, [jaar["Model"] for jaar in bouw_meerjaren(filings)])
+	assert "Ledger_Total" in wb.defined_names
+	ws = wb[labels.TAB_LBO]
+	waarden = [ws.cell(row=r, column=6).value for r in range(1, ws.max_row + 1) if str(ws.cell(row=r, column=1).value).startswith("A")]
+	assert waarden[:2] == [1, 0]
+	entry = ws[f"C{kaart['rijen']['lbo']['entry_ebitda_rij']}"].value
+	assert entry.endswith("+Ledger_Total")
+
+
+def test_approved_item_also_lowers_the_ai_cost_ratio(cijfers, filings):
+	from src.assumpties import AssumptieAntwoord, pack_uit_antwoord
+	from tests.test_assumpties import nagebootste_gemini_respons
+
+	def rij(items):
+		pack = pack_uit_antwoord(AssumptieAntwoord.model_validate(nagebootste_gemini_respons()))
+		return bouw_dataframe([{**cijfers, "LBO_Assumpties": pack, "LBO_Assumptie_Bron": labels.ASSUMPTIONS_AI, "LBO_Adjustments": items}]).iloc[0]
+
+	zonder, met = rij([]), rij([ledger_item()])
+	verschil = 100_000.0 / zonder["Omzet_of_Brutomarge"] * 100
+	a, b = (r["LBO_Assumpties"]["base"]["overige_kosten_pct"]["waarden"][0] for r in (zonder, met))
+	assert b == pytest.approx(a - verschil)
+	jaar1 = [r["LBO_Scenarios"]["base"]["Jaren"][1] for r in (zonder, met)]
+	assert jaar1[1]["EBITDA"] - jaar1[0]["EBITDA"] == pytest.approx(verschil / 100 * jaar1[1]["Omzet"])

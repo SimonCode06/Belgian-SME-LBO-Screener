@@ -327,3 +327,35 @@ def test_workbook_standard(rij, tmp_path, filings):
 	assert "Scenario" in boek.defined_names and len(model.data_validations.dataValidation) == 1
 	assert lbo.conditional_formatting and boek.calculation.fullCalcOnLoad
 	assert boek.calculation.iterate in (None, False)
+
+
+def test_ledger_switch_flows_through_excel(excel, tmp_path, rij, filings):
+	"""An approved EUR 100k adjustment raises Entry EBITDA in Python and Excel; switching it off in Excel removes it."""
+	pack, cijfers = rij
+	item = {
+		"id": "A1", "categorie": "eenmalig", "omschrijving": "One-off cost.", "richting": "+", "bedrag": 100_000.0,
+		"bron": "CSV", "bedrag_geverifieerd": True, "pagina": 1, "citaat_status": "verified", "market_level": None,
+		"goedgekeurd": True,
+	}
+	df = calculations.bouw_dataframe(
+		[{**cijfers, "LBO_Assumpties": pack, "LBO_Assumptie_Bron": labels.ASSUMPTIONS_AI, "LBO_Adjustments": [item]}]
+	)
+	df_rij = df.iloc[0]
+	historiek = [jaar["Model"] for jaar in bouw_meerjaren(filings)]
+	wb, kaart = excel_model.bouw_werkboek(df_rij, historiek)
+	pad = tmp_path / "ledger.xlsx"
+	wb.save(pad)
+	open_wb = Open(excel, pad, kaart)
+	try:
+		vergelijk_scenario(open_wb, df_rij, "base")
+		entry = open_wb.cel("lbo", "entry_ebitda_rij")
+		assert entry == pytest.approx(df_rij["Genormaliseerde_EBITDA"], abs=TOLERANTIE_EUR)
+		schakelaar = next(
+			nr for nr in range(1, 400) if str(open_wb.lbo.Range(f"A{nr}").Value or "").startswith("A1 ")
+		)
+		open_wb.lbo.Range(f"F{schakelaar}").Value = 0
+		open_wb.reken()
+		assert open_wb.cel("lbo", "entry_ebitda_rij") == pytest.approx(entry - 100_000.0, abs=TOLERANTIE_EUR)
+		assert open_wb.checks() == labels.CHECK_OK
+	finally:
+		open_wb.sluit()

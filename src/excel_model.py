@@ -22,7 +22,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.workbook.defined_name import DefinedName
 from openpyxl.worksheet.datavalidation import DataValidation
 
-from . import assumpties, config, labels
+from . import assumpties, config, labels, normalisaties
 from . import excel_stijl as stijl
 from .lbo_model import net_debt_formule
 
@@ -620,7 +620,7 @@ def _twc_laatste(rij):
 def _enkelvoudig_lbo(rij):
 	"""Single-value blocks of the LBO tab: (key, name, kind, content, format, style, section)."""
 	return [
-		("entry_ebitda", "Entry_EBITDA", "f", lambda c: f"={c.xa('ebitda')}", stijl.FMT_BEDRAG, "normaal"),
+		("entry_ebitda", "Entry_EBITDA", "f", lambda c: f"={c.xa('ebitda')}+Ledger_Total", stijl.FMT_BEDRAG, "normaal"),
 		("entry_ev", "Entry_EV", "f", lambda c: "=Entry_EBITDA*Entry_Multiple", stijl.FMT_BEDRAG, "subtotaal"),
 		("fin_debt", "Financial_Debt", "f", lambda c: f"={c.xa('exist_debt')}", stijl.FMT_BEDRAG, "normaal"),
 		("cash_br", "Cash_At_Signing", "i", float(rij["Liquide_Middelen"]), stijl.FMT_BEDRAG, "normaal"),
@@ -766,6 +766,14 @@ class Bouwer:
 			self.namen[naam] = f"{ZIJDE_LBO}$C${rij_nr}"
 			rij_nr += 1
 		rij_nr += 1
+		# EBITDA adjustments ledger: section, header, one row per item, total
+		self.ledger = list(self.rij.get("LBO_Adjustments") or [])
+		self.ledger_start = rij_nr
+		self.ledger_eerste = rij_nr + 2
+		rij_nr = self.ledger_eerste + max(len(self.ledger), 1)
+		self.r["lbo"]["ledger_total"] = rij_nr
+		self.namen["Ledger_Total"] = f"{ZIJDE_LBO}$C${rij_nr}"
+		rij_nr += 2
 		self.brug = _enkelvoudig_lbo(self.rij)
 		self.brug_start = rij_nr
 		rij_nr += 1
@@ -1144,6 +1152,42 @@ class Bouwer:
 			self._zet(ws, nr, 3, inhoud(c) if soort == "f" else inhoud, fmt)
 			self._rij_stijl(ws, nr, opmaak, 3)
 
+	def _schrijf_ledger(self, ws):
+		"""One row per proposed adjustment. The yellow switch (1/0) starts at the status in the ledger file."""
+		self._sectie(ws, self.ledger_start, labels.SECTION_LEDGER)
+		kop = self.ledger_start + 1
+		for kolom, tekst in enumerate(labels.LEDGER_HEADERS, start=3):
+			cel = ws.cell(row=kop, column=kolom, value=tekst)
+			cel.font = stijl.lettertype(vet=True, grootte=8)
+			cel.alignment = Alignment(horizontal="center", wrap_text=True)
+		ws.row_dimensions[kop].height = 24
+		factor = 12 / float(self.rij["Boekjaar_Maanden"])
+		for index, item in enumerate(self.ledger):
+			nr = self.ledger_eerste + index
+			self._label(ws, nr, f"{item['id']} {labels.ADJUSTMENT_TYPES.get(item['categorie'], item['categorie'])} ({item['richting']})")
+			self._zet(ws, nr, 3, item.get("bedrag"), stijl.FMT_BEDRAG)
+			markt = ws.cell(row=nr, column=4, value=item.get("market_level"))
+			self._zet(ws, nr, 5, 1 if item.get("bedrag_geverifieerd") else 0, "0")
+			schakelaar = self._zet(ws, nr, 6, 1 if item.get("goedgekeurd") else 0, "0")
+			for cel in (markt, schakelaar):
+				cel.fill = stijl.VUL_OVERRIDE
+				cel.border = stijl.RAND_OVERRIDE
+				cel.font = stijl.lettertype(stijl.BLAUW)
+				cel.number_format = stijl.FMT_BEDRAG if cel is markt else "0"
+			basis = f"IF(ISBLANK(D{nr}),0,N(C{nr})-D{nr})" if item["categorie"] == normalisaties.CATEGORIE_MARKTNIVEAU else f"N(C{nr})"
+			teken = "" if item.get("richting", "+") == "+" else "-"
+			self._zet(ws, nr, 7, f"=F{nr}*E{nr}*{teken}{basis}*{factor!r}", stijl.FMT_BEDRAG)
+			tekst = f"{item.get('omschrijving', '')} | {item.get('bron', '')} | p. {item.get('pagina') or '-'}, quote {item.get('citaat_status', '')}"
+			cel = ws.cell(row=nr, column=8, value=tekst)
+			cel.font = stijl.lettertype(grootte=8)
+		if not self.ledger:
+			ws.cell(row=self.ledger_eerste, column=1, value=labels.LEDGER_EMPTY).font = stijl.lettertype(cursief=True)
+		totaal = self.r["lbo"]["ledger_total"]
+		self._label(ws, totaal, labels.LEDGER_TOTAL, vet=True)
+		laatste = self.ledger_eerste + max(len(self.ledger), 1) - 1
+		self._zet(ws, totaal, 3, f"=SUM(G{self.ledger_eerste}:G{laatste})", stijl.FMT_BEDRAG, vet=True)
+		self._rij_stijl(ws, totaal, "subtotaal", 3)
+
 	def schrijf_lbo(self):
 		ws = self.ws_lbo
 		self._kop(ws, labels.TITLE_LBO, "lbo")
@@ -1153,6 +1197,7 @@ class Bouwer:
 			self._label(ws, nr, labels.INPUT_LABELS[naam])
 			self._zet(ws, nr, 3, waarde, fmt)
 
+		self._schrijf_ledger(ws)
 		self._enkelvoudig(ws, self.brug, labels.SECTION_BRIDGE, self.brug_start)
 		self._enkelvoudig(ws, self.su, labels.SECTION_SU, self.su_start)
 		self._schrijf_rijen(ws, self.lbo_specs, "lbo")

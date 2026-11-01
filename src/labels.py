@@ -248,6 +248,7 @@ ASSUMPTION_FLAG_EBITDA_CAGR = (
 	"Base EBITDA CAGR {ai:+.1f}% against a historical {hist:+.1f}%: more than {pp:.0f} pp above the trend"
 )
 DD_LINKED_TO = "tests"
+ASSUMPTION_LEDGER = "Lowered by {pp:.2f} pp for the approved EBITDA adjustments (ledger)"
 QUOTE_NOT_FOUND = "Quoted source not found in the PDF: confidence set to low"
 AMOUNT_FROM_CSV = "CSV code {code}"
 AMOUNT_AI_UNVERIFIED = "AI, to be verified"
@@ -328,6 +329,10 @@ SECTION_SCHEDULES = "FIXED ASSETS, GOODWILL AND FINANCING FEES"
 SECTION_CHECKS = "MODEL INTEGRITY CHECKS"
 SECTION_INPUTS = "TRANSACTION INPUTS"
 SECTION_BRIDGE = "EV-TO-EQUITY BRIDGE"
+SECTION_LEDGER = "EBITDA ADJUSTMENTS (LEDGER): SET 'APPROVED' TO 1 TO INCLUDE AN ITEM"
+LEDGER_HEADERS = ("Amount (EUR)", "Market Level", "Verified (1/0)", "Approved (1/0)", "EBITDA Effect", "Description | Source | Quote")
+LEDGER_EMPTY = "No adjustments proposed"
+LEDGER_TOTAL = "Approved EBITDA Adjustments"
 SECTION_SU = "SOURCES & USES"
 SECTION_DEBT = "DEBT SCHEDULE"
 SECTION_INTEREST = "INTEREST"
@@ -650,6 +655,7 @@ COLUMN_LABELS = {
 	"NWC_Peg": "NWC Peg",
 	"NWC_Peg_Jaren": "NWC Peg: Year-Ends Used",
 	"NWC_Aanpassing": "NWC Adjustment (to Seller)",
+	"Ledger_EBITDA": "Approved EBITDA Adjustments (Ledger)",
 	"Open_Intercompany_Cash_Like": "Opening: Intercompany Cash-Like",
 	"Voorraden": "Inventory",
 	"Handelsvorderingen": "Trade Receivables",

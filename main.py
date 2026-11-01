@@ -21,7 +21,7 @@ import pandas as pd
 from google import genai
 from google.genai import types
 
-from src import assumpties, citaten, config, labels
+from src import assumpties, citaten, config, labels, normalisaties
 from src.ai_extraction import (
 	analyseer_tekst,
 	bouw_assumptie_prompt,
@@ -345,6 +345,16 @@ def main(argv=None):
 			"gemini_model": assumptie_model,
 		}
 		velden = koppel_tekst(cijfers, tekst, bedrijf[-1].codes, paginas)
+		try:
+			ledger = normalisaties.laad_of_maak(
+				normalisaties.ledger_pad(cijfers["Ondernemingsnummer"], cijfers["Boekjaar"]),
+				velden.get("AI_Normalisaties"),
+				cijfers["Bedrijfsnaam"],
+			)
+		except ValueError as fout:
+			print(f"   -> FOUT in de adjustment ledger: {fout}")
+			mislukt.append(f"ledger {cijfers['Bedrijfsnaam']}")
+			ledger = []
 		if pack is not None:
 			citaten.controleer_assumpties(pack, paginas, assumpties.SCENARIOS)
 		if assumptie_model:
@@ -360,6 +370,7 @@ def main(argv=None):
 				"LBO_Snapshot_Datum": snapshot["datum"] if snapshot else "-",
 				"LBO_Snapshot_Status": snapshot["status"] if snapshot else "-",
 				"AI_Business_Model": snapshot["business_model"] if snapshot else "",
+				"LBO_Adjustments": ledger,
 			}
 		)
 
