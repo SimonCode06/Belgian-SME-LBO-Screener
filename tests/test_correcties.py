@@ -226,10 +226,10 @@ def test_workbook_has_the_ledger_table_with_switches(cijfers, filings):
 	rij = bouw_dataframe([{**cijfers, "LBO_Adjustments": [ledger_item(), ledger_item(id="A2", goedgekeurd=False)]}]).iloc[0]
 	wb, kaart = excel_model.bouw_werkboek(rij, [jaar["Model"] for jaar in bouw_meerjaren(filings)])
 	assert "Ledger_Total" in wb.defined_names
-	ws = wb[labels.TAB_LBO]
-	waarden = [ws.cell(row=r, column=6).value for r in range(1, ws.max_row + 1) if str(ws.cell(row=r, column=1).value).startswith("A")]
+	ws = wb[labels.TAB_INPUTS]
+	waarden = [ws.cell(row=r, column=6).value for r in range(1, ws.max_row + 1) if str(ws.cell(row=r, column=1).value).startswith(("A1 ", "A2 "))]
 	assert waarden[:2] == [1, 0]
-	entry = ws[f"C{kaart['rijen']['lbo']['entry_ebitda_rij']}"].value
+	entry = wb[labels.TAB_LBO][f"C{kaart['rijen']['lbo']['entry_ebitda_rij']}"].value
 	assert entry.endswith("+Ledger_Total")
 
 

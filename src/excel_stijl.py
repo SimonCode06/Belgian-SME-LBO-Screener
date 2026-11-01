@@ -41,8 +41,10 @@ VUL_OVERRIDE = PatternFill("solid", fgColor=VULLING_OVERRIDE)
 VUL_ACTUAL = PatternFill("solid", fgColor=VULLING_ACTUAL)
 
 
-def lettertype(kleur=ZWART, vet=False, cursief=False, grootte=GROOTTE):
-	return Font(name=LETTERTYPE, size=grootte, bold=vet, italic=cursief, color=kleur)
+def lettertype(kleur=ZWART, vet=False, cursief=False, grootte=GROOTTE, onderstreept=False):
+	return Font(
+		name=LETTERTYPE, size=grootte, bold=vet, italic=cursief, color=kleur, underline="single" if onderstreept else None
+	)
 
 
 def sectiekop(cel, tekst=None):

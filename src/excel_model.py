@@ -1,6 +1,8 @@
 """The company workbook: a live, formula-driven 3-statement LBO model.
 
-Three tabs: Executive Summary, 3-Statement Model and LBO Analysis. All forecast cells are
+Tabs: Executive Summary, Inputs & Assumptions (every input: scenario selector, transaction
+inputs, EBITDA ledger and the AI proposal / override / used blocks), 3-Statement Model and
+LBO Analysis (calculation only). All forecast cells are
 Excel formulas that follow lbo_model.py line by line: sweep on excess cash flow, RCF, goodwill,
 financing fees and tax rules. Interest runs on opening balances, so there is no circular
 reference. The AI proposals are inputs; a user override flows through everything live.
@@ -29,8 +31,9 @@ from .lbo_model import net_debt_formule
 HOOFD = 4  # rows above the data: title, checks, LBO year, fiscal year
 ZIJDE_MODEL = "'" + labels.TAB_MODEL + "'!"
 ZIJDE_LBO = "'" + labels.TAB_LBO + "'!"
+ZIJDE_INP = "'" + labels.TAB_INPUTS + "'!"
 PURE_LINK = re.compile(r"^=-?'[^']+'!\$?[A-Z]+\$?\d+$")
-PURE_NAAM = re.compile(r"^=-?[A-Z][A-Za-z]*_[A-Za-z_]+$")  # a named cell, which lives on the LBO tab
+PURE_NAAM = re.compile(r"^=-?([A-Z][A-Za-z]*_[A-Za-z_]+)$")  # a named cell: a link when it lives on another tab
 
 
 class Kolommen:
@@ -593,51 +596,54 @@ STRUCTUUR_RIJEN = (
 )
 
 
+INGEKLAPTE_GROEPEN = ("settings",)  # technical switches: grouped and collapsed by default
+
+
 def _invoer(rij):
-	"""The transaction inputs: (name, value, format). All are blue, all live."""
+	"""The transaction inputs: (group, name, value, format). All are blue, all live."""
 	bank = config.NET_DEBT_DEFINITIES["bank_covenant"]
 	waardering = config.NET_DEBT_DEFINITIES["waardering"]
 	return [
-		("Entry_Multiple", float(rij["Instap_Multiple"]), stijl.FMT_MULT),
-		("Exit_Multiple", float(rij["Instap_Multiple"]), stijl.FMT_MULT),
-		("Senior_Multiple", float(rij["Senior_Multiple"]), stijl.FMT_MULT),
-		("Senior_Rate", float(rij["Senior_Rente_Pct"]) / 100, stijl.FMT_PCT),
-		("Senior_Amortisation", float(rij["Senior_Aflossing_Pct"]) / 100, stijl.FMT_PCT),
-		("Senior_Tenor", config.LBO_SENIOR_LOOPTIJD_JAAR, stijl.FMT_GETAL),
-		("Cash_Sweep_Pct", config.LBO_CASH_SWEEP_PCT, stijl.FMT_PCT),
-		("Vendor_Pct_EV", config.LBO_VENDOR_LOAN_PCT_EV, stijl.FMT_PCT),
-		("Vendor_Rate", config.LBO_VENDOR_LOAN_RENTE, stijl.FMT_PCT),
-		("Transaction_Fee_Pct", config.LBO_TRANSACTIEKOSTEN_PCT, stijl.FMT_PCT),
-		("Financing_Fee_Pct", config.LBO_FINANCIERINGSKOSTEN_PCT, stijl.FMT_PCT),
-		("RCF_Limit_X", config.LBO_RCF_LIMIET_X_EBITDA, stijl.FMT_MULT),
-		("RCF_Rate", config.LBO_RCF_RENTE, stijl.FMT_PCT),
-		("RCF_Commitment_Fee", config.LBO_RCF_COMMITMENT_FEE, "0.00%"),
-		("Cash_Rate", config.LBO_CASH_RENTE, stijl.FMT_PCT),
-		("Dividend_Pct", config.LBO_DIVIDEND_PCT, stijl.FMT_PCT),
-		("Tax_Rate", config.LBO_TAX_RATE, stijl.FMT_PCT),
-		("SME_Rate_On", 1 if config.LBO_KMO_TARIEF_TOEPASSEN else 0, "0"),
-		("SME_Rate", config.LBO_KMO_TARIEF, stijl.FMT_PCT),
-		("SME_Bracket", config.LBO_KMO_SCHIJF, stijl.FMT_BEDRAG),
-		("Interest_Deduct_From", config.LBO_RENTEAFTREK_VANAF_JAAR, "0"),
-		("Interest_Cap_EUR", config.LBO_RENTEAFTREK_DREMPEL_EUR, stijl.FMT_BEDRAG),
-		("Interest_Cap_Pct", config.LBO_RENTEAFTREK_EBITDA_PCT, stijl.FMT_PCT),
-		("Goodwill_Life", config.LBO_GOODWILL_LOOPTIJD_JAAR, stijl.FMT_GETAL),
-		("Capex_Life", config.LBO_CAPEX_LEVENSDUUR_JAAR, stijl.FMT_GETAL),
-		("Min_DSCR", config.LBO_COVENANT_MIN_DSCR, stijl.FMT_MULT_2),
-		("Min_ICR", config.LBO_COVENANT_MIN_RENTEDEKKING, stijl.FMT_MULT_2),
-		("Max_Leverage", config.LBO_COVENANT_MAX_LEVERAGE, stijl.FMT_MULT_2),
-		("Target_Leverage", config.LBO_TARGET_END_LEVERAGE, stijl.FMT_MULT_2),
-		("Days_Year", config.DAGEN_PER_JAAR, "0"),
-		("Months_Year", 12, "0"),
-		("Min_Cash_Months", config.MIN_CASH_MAANDEN_OPEX, stijl.FMT_GETAL),
-		("Min_Cash_Pct_Purchases", config.MIN_CASH_PCT_INKOOP, stijl.FMT_PCT),
-		("Goods_Basis", rij["Driver_Kosten_60_Pct"] / 100, stijl.FMT_PCT),
-		("Purchases_Basis", rij["Driver_Kosten_6061_Pct"] / 100, stijl.FMT_PCT),
-		("Bank_Excess_Only", 1 if bank["alleen_cash_boven_minimum"] else 0, "0"),
-		("Bank_Debt_Like", 1 if bank["debt_like_meetellen"] else 0, "0"),
-		("Val_Excess_Only", 1 if waardering["alleen_cash_boven_minimum"] else 0, "0"),
-		("Val_Debt_Like", 1 if waardering["debt_like_meetellen"] else 0, "0"),
-		("Check_Tolerance", 1, "0"),
+		("valuation", "Entry_Multiple", float(rij["Instap_Multiple"]), stijl.FMT_MULT),
+		("valuation", "Exit_Multiple", float(rij["Instap_Multiple"]), stijl.FMT_MULT),
+		("senior", "Senior_Multiple", float(rij["Senior_Multiple"]), stijl.FMT_MULT),
+		("senior", "Senior_Rate", float(rij["Senior_Rente_Pct"]) / 100, stijl.FMT_PCT),
+		("senior", "Senior_Amortisation", float(rij["Senior_Aflossing_Pct"]) / 100, stijl.FMT_PCT),
+		("senior", "Senior_Tenor", config.LBO_SENIOR_LOOPTIJD_JAAR, stijl.FMT_GETAL),
+		("senior", "Cash_Sweep_Pct", config.LBO_CASH_SWEEP_PCT, stijl.FMT_PCT),
+		("vendor", "Vendor_Pct_EV", config.LBO_VENDOR_LOAN_PCT_EV, stijl.FMT_PCT),
+		("vendor", "Vendor_Rate", config.LBO_VENDOR_LOAN_RENTE, stijl.FMT_PCT),
+		("rcf", "RCF_Limit_X", config.LBO_RCF_LIMIET_X_EBITDA, stijl.FMT_MULT),
+		("rcf", "RCF_Rate", config.LBO_RCF_RENTE, stijl.FMT_PCT),
+		("rcf", "RCF_Commitment_Fee", config.LBO_RCF_COMMITMENT_FEE, "0.00%"),
+		("fees", "Transaction_Fee_Pct", config.LBO_TRANSACTIEKOSTEN_PCT, stijl.FMT_PCT),
+		("fees", "Financing_Fee_Pct", config.LBO_FINANCIERINGSKOSTEN_PCT, stijl.FMT_PCT),
+		("fees", "Cash_Rate", config.LBO_CASH_RENTE, stijl.FMT_PCT),
+		("fees", "Dividend_Pct", config.LBO_DIVIDEND_PCT, stijl.FMT_PCT),
+		("tax", "Tax_Rate", config.LBO_TAX_RATE, stijl.FMT_PCT),
+		("tax", "SME_Rate_On", 1 if config.LBO_KMO_TARIEF_TOEPASSEN else 0, "0"),
+		("tax", "SME_Rate", config.LBO_KMO_TARIEF, stijl.FMT_PCT),
+		("tax", "SME_Bracket", config.LBO_KMO_SCHIJF, stijl.FMT_BEDRAG),
+		("tax", "Interest_Deduct_From", config.LBO_RENTEAFTREK_VANAF_JAAR, "0"),
+		("tax", "Interest_Cap_EUR", config.LBO_RENTEAFTREK_DREMPEL_EUR, stijl.FMT_BEDRAG),
+		("tax", "Interest_Cap_Pct", config.LBO_RENTEAFTREK_EBITDA_PCT, stijl.FMT_PCT),
+		("tax", "Goodwill_Life", config.LBO_GOODWILL_LOOPTIJD_JAAR, stijl.FMT_GETAL),
+		("tax", "Capex_Life", config.LBO_CAPEX_LEVENSDUUR_JAAR, stijl.FMT_GETAL),
+		("covenants", "Min_DSCR", config.LBO_COVENANT_MIN_DSCR, stijl.FMT_MULT_2),
+		("covenants", "Min_ICR", config.LBO_COVENANT_MIN_RENTEDEKKING, stijl.FMT_MULT_2),
+		("covenants", "Max_Leverage", config.LBO_COVENANT_MAX_LEVERAGE, stijl.FMT_MULT_2),
+		("covenants", "Target_Leverage", config.LBO_TARGET_END_LEVERAGE, stijl.FMT_MULT_2),
+		("working", "Min_Cash_Months", config.MIN_CASH_MAANDEN_OPEX, stijl.FMT_GETAL),
+		("working", "Min_Cash_Pct_Purchases", config.MIN_CASH_PCT_INKOOP, stijl.FMT_PCT),
+		("working", "Goods_Basis", rij["Driver_Kosten_60_Pct"] / 100, stijl.FMT_PCT),
+		("working", "Purchases_Basis", rij["Driver_Kosten_6061_Pct"] / 100, stijl.FMT_PCT),
+		("settings", "Days_Year", config.DAGEN_PER_JAAR, "0"),
+		("settings", "Months_Year", 12, "0"),
+		("settings", "Bank_Excess_Only", 1 if bank["alleen_cash_boven_minimum"] else 0, "0"),
+		("settings", "Bank_Debt_Like", 1 if bank["debt_like_meetellen"] else 0, "0"),
+		("settings", "Val_Excess_Only", 1 if waardering["alleen_cash_boven_minimum"] else 0, "0"),
+		("settings", "Val_Debt_Like", 1 if waardering["debt_like_meetellen"] else 0, "0"),
+		("settings", "Check_Tolerance", 1, "0"),
 	]
 
 
@@ -744,34 +750,68 @@ class Bouwer:
 		self.historiek = historiek[-config.LBO_MAX_JAREN:]
 		self.kol = Kolommen(len(self.historiek))
 		self.pack = rij["LBO_Assumpties"]
-		self.r = {"model": {}, "lbo": {}}
+		self.r = {"model": {}, "lbo": {}, "inp": {}}
 		self.namen = {}
 		self.wb = Workbook()
 		self.ws_samenvatting = self.wb.active
 		self.ws_samenvatting.title = labels.TAB_SUMMARY
+		self.ws_inp = self.wb.create_sheet(labels.TAB_INPUTS)
 		self.ws_model = self.wb.create_sheet(labels.TAB_MODEL)
 		self.ws_lbo = self.wb.create_sheet(labels.TAB_LBO)
 		self.override_cellen = []
 
 	# ------------------------------------------------------------------ row layout
-	def _plan_model(self):
+	def _plan_inputs(self):
+		"""Inputs & Assumptions: selector, transaction inputs, ledger and the assumption blocks."""
+		ri = self.r["inp"]
 		rij_nr = HOOFD + 1
 		self.scenario_rij = rij_nr + 1
-		rij_nr += 8  # section, selector, index, three-line legend and a blank line
-		self.r["model"]["jaar_nr"] = rij_nr + 1
-		self.r["model"]["einde"] = rij_nr + 2
-		self.r["model"]["fractie"] = rij_nr + 3
-		rij_nr += 5
+		rij_nr += 10  # section, selector, list, index, five-line legend and a blank line
+
+		self.invoer = _invoer(self.rij)
+		self.invoer_start = rij_nr
+		rij_nr += 1
+		vorige = None
+		self.invoer_groepen = {}
+		for groep, naam, _, _ in self.invoer:
+			if groep != vorige:
+				self.invoer_groepen[groep] = [rij_nr, rij_nr]
+				rij_nr += 1
+				vorige = groep
+			self.namen[naam] = f"{ZIJDE_INP}$C${rij_nr}"
+			ri[naam] = rij_nr
+			self.invoer_groepen[groep][1] = rij_nr
+			rij_nr += 1
+		rij_nr += 1
+
+		# EBITDA adjustments ledger: section, header, one row per item, total
+		self.ledger = list(self.rij.get("LBO_Adjustments") or [])
+		self.ledger_start = rij_nr
+		self.ledger_eerste = rij_nr + 2
+		rij_nr = self.ledger_eerste + max(len(self.ledger), 1)
+		ri["ledger_total"] = rij_nr
+		self.namen["Ledger_Total"] = f"{ZIJDE_INP}$C${rij_nr}"
+		rij_nr += 2
+
 		self.ai_blokken = {}
 		for scenario in assumpties.MODEL_SCENARIOS:
 			self.ai_blokken[scenario] = rij_nr
 			rij_nr += 1
 			for driver in assumpties.DRIVERS:
-				self.r["model"][f"ai_{scenario}_{driver.sleutel}"] = rij_nr
-				self.r["model"][f"ov_{scenario}_{driver.sleutel}"] = rij_nr + 1
-				self.r["model"][f"u_{scenario}_{driver.sleutel}"] = rij_nr + 2
+				ri[f"ai_{scenario}_{driver.sleutel}"] = rij_nr
+				ri[f"ov_{scenario}_{driver.sleutel}"] = rij_nr + 1
+				ri[f"u_{scenario}_{driver.sleutel}"] = rij_nr + 2
 				rij_nr += 3
 			rij_nr += 1
+		self.inp_einde = rij_nr
+		self._namen_kiezer()
+
+	def _plan_model(self):
+		rij_nr = HOOFD + 1
+		self.r["model"]["jaar_nr"] = rij_nr + 1
+		self.r["model"]["einde"] = rij_nr + 2
+		self.r["model"]["fractie"] = rij_nr + 3
+		rij_nr += 5
 		self.actief_blok = rij_nr
 		rij_nr += 1
 		for driver in assumpties.DRIVERS:
@@ -795,21 +835,7 @@ class Bouwer:
 		self.model_einde = rij_nr
 
 	def _plan_lbo(self):
-		rij_nr = HOOFD + 2
-		self.invoer = _invoer(self.rij)
-		self.invoer_start = rij_nr
-		for naam, _, _ in self.invoer:
-			self.namen[naam] = f"{ZIJDE_LBO}$C${rij_nr}"
-			rij_nr += 1
-		rij_nr += 1
-		# EBITDA adjustments ledger: section, header, one row per item, total
-		self.ledger = list(self.rij.get("LBO_Adjustments") or [])
-		self.ledger_start = rij_nr
-		self.ledger_eerste = rij_nr + 2
-		rij_nr = self.ledger_eerste + max(len(self.ledger), 1)
-		self.r["lbo"]["ledger_total"] = rij_nr
-		self.namen["Ledger_Total"] = f"{ZIJDE_LBO}$C${rij_nr}"
-		rij_nr += 2
+		rij_nr = HOOFD + 1
 		self.brug = _enkelvoudig_lbo(self.rij)
 		self.brug_start = rij_nr
 		rij_nr += 1
@@ -860,7 +886,9 @@ class Bouwer:
 		cel = ws.cell(row=rij, column=kolom, value=waarde)
 		if soort is None:
 			if isinstance(waarde, str) and waarde.startswith("="):
-				andere_tab = ws is not self.ws_lbo and PURE_NAAM.match(waarde)
+				naam = PURE_NAAM.match(waarde)
+				thuis = self.namen.get(naam.group(1), "") if naam else ""
+				andere_tab = bool(thuis) and not thuis.startswith("'" + ws.title + "'!")
 				soort = "link" if PURE_LINK.match(waarde) or andere_tab else "formule"
 			else:
 				soort = "invoer"
@@ -904,7 +932,7 @@ class Bouwer:
 	def _kop(self, ws, titel, blad):
 		"""Title, checks row, LBO year and fiscal year: the same on every tab."""
 		tot = self.kol.laatste_jaar
-		for kolom in range(1, (self.kol.overrides if blad == "model" else tot) + 1):
+		for kolom in range(1, (self.kol.overrides if blad in ("model", "inp") else tot) + 1):
 			stijl.sectiekop(ws.cell(row=1, column=kolom))
 		ws.cell(row=1, column=1, value=f"{titel}: {self.rij['Bedrijfsnaam']}   ({labels.UNITS_NOTE})")
 
@@ -1027,19 +1055,14 @@ class Bouwer:
 		keuzelijst = DataValidation(type="list", formula1='"' + ",".join(namen) + '"', allow_blank=False)
 		ws.add_data_validation(keuzelijst)
 		keuzelijst.add(kiezer)
-		self.namen["Scenario"] = f"{ZIJDE_MODEL}$C${self.scenario_rij}"
-
 		lijst_rij = self.scenario_rij + 1
 		self._label(ws, lijst_rij, labels.SCENARIO_LIST)
 		for index, naam in enumerate(namen):
 			self._zet(ws, lijst_rij, 3 + index, naam)
-		laatste = get_column_letter(2 + len(namen))
-		self.namen["Scenario_List"] = f"{ZIJDE_MODEL}$C${lijst_rij}:${laatste}${lijst_rij}"
 
 		index_rij = lijst_rij + 1
 		self._label(ws, index_rij, labels.SCENARIO_INDEX)
 		self._zet(ws, index_rij, 3, "=MATCH(Scenario,Scenario_List,0)", "0")
-		self.namen["Scenario_Index"] = f"{ZIJDE_MODEL}$C${index_rij}"
 
 		legenda = index_rij + 1
 		self._label(ws, legenda, labels.LEGEND, vet=True)
@@ -1050,6 +1073,14 @@ class Bouwer:
 		cel.font = stijl.lettertype(stijl.BLAUW)
 		for kolom in range(3, 9):
 			ws.cell(row=legenda + 3, column=kolom).fill = stijl.VUL_OVERRIDE
+		ws.cell(row=legenda + 4, column=3, value=labels.LEGEND_GROUPS).font = stijl.lettertype(cursief=True)
+
+	def _namen_kiezer(self):
+		lijst_rij = self.scenario_rij + 1
+		laatste = get_column_letter(2 + len(assumpties.MODEL_SCENARIOS))
+		self.namen["Scenario"] = f"{ZIJDE_INP}$C${self.scenario_rij}"
+		self.namen["Scenario_List"] = f"{ZIJDE_INP}$C${lijst_rij}:${laatste}${lijst_rij}"
+		self.namen["Scenario_Index"] = f"{ZIJDE_INP}$C${lijst_rij + 1}"
 
 	def _schrijf_tijdlijn(self, ws):
 		rm = self.r["model"]
@@ -1073,7 +1104,8 @@ class Bouwer:
 			cel.alignment = Alignment(wrap_text=False, vertical="center")
 
 	def _schrijf_ai_blokken(self, ws):
-		rm = self.r["model"]
+		"""Per scenario and driver: AI proposal and override (grouped, collapsed), then the used value."""
+		rm = self.r["inp"]
 		for scenario in assumpties.MODEL_SCENARIOS:
 			naam = assumpties.scenario_label(scenario)
 			rij_ai = labels.ROW_RULE_BASED if assumpties.is_screening(scenario) else labels.ROW_AI
@@ -1107,17 +1139,21 @@ class Bouwer:
 					cel.number_format = fmt
 					cel.alignment = Alignment(horizontal="right")
 					self._zet(ws, used_rij, kolom, f"=IF(ISBLANK({k}{ov_rij}),{k}{ai_rij},{k}{ov_rij})", fmt)
+				# The rationale sits on the visible 'Used' row, so it can be read with the block collapsed
 				self._schrijf_tekstkolommen(
-					ws, ai_rij,
+					ws, used_rij,
 					(voorstel["rationale"], voorstel["source"], voorstel["confidence"], "; ".join(voorstel["vlaggen"])),
 				)
 				eerste = get_column_letter(self.kol.jaren[0])
 				laatste = get_column_letter(self.kol.jaren[-1])
-				self._zet(ws, ov_rij, self.kol.overrides, f"=COUNTA({eerste}{ov_rij}:{laatste}{ov_rij})", "0")
-				self.override_cellen.append(f"{get_column_letter(self.kol.overrides)}{ov_rij}")
+				self._zet(ws, used_rij, self.kol.overrides, f"=COUNTA({eerste}{ov_rij}:{laatste}{ov_rij})", "0")
+				self.override_cellen.append(f"{get_column_letter(self.kol.overrides)}{used_rij}")
 				for nr in (ai_rij, ov_rij, used_rij):
 					self._grijs(ws, nr)
-				ws.row_dimensions.group(ai_rij, used_rij, outline_level=1, hidden=False)
+				for nr in (ai_rij, ov_rij):
+					ws.row_dimensions[nr].outlineLevel = 1
+					ws.row_dimensions[nr].hidden = True
+				ws.row_dimensions[used_rij].collapsed = True
 
 	def _schrijf_actief(self, ws):
 		rm = self.r["model"]
@@ -1139,13 +1175,18 @@ class Bouwer:
 					waarde = _waarde(self.historiek[index], driver.historiek)
 					if waarde is not None:
 						self._zet(ws, nr, kolom, self._driver_waarde(driver, waarde), fmt)
+			ri = self.r["inp"]
 			for kolom in self.kol.jaren:
 				k = get_column_letter(kolom)
-				keuzes = ",".join(f"{k}{rm[f'u_{scenario}_{driver.sleutel}']}" for scenario in assumpties.MODEL_SCENARIOS)
+				keuzes = ",".join(
+					f"{ZIJDE_INP}{k}{ri[f'u_{scenario}_{driver.sleutel}']}" for scenario in assumpties.MODEL_SCENARIOS
+				)
 				self._zet(ws, nr, kolom, f"=CHOOSE(Scenario_Index,{keuzes})", fmt)
 			for kolom in (self.kol.rationale, self.kol.source, self.kol.confidence, self.kol.flag):
 				k = get_column_letter(kolom)
-				keuzes = ",".join(f"{k}{rm[f'ai_{scenario}_{driver.sleutel}']}" for scenario in assumpties.MODEL_SCENARIOS)
+				keuzes = ",".join(
+					f"{ZIJDE_INP}{k}{ri[f'u_{scenario}_{driver.sleutel}']}" for scenario in assumpties.MODEL_SCENARIOS
+				)
 				cel = ws.cell(row=nr, column=kolom, value=f'=CHOOSE(Scenario_Index,{keuzes})&""')
 				cel.font = stijl.lettertype(grootte=8)
 			self._grijs(ws, nr)
@@ -1169,21 +1210,52 @@ class Bouwer:
 		self._grijs(ws, nr)
 
 	# ------------------------------------------------------------------ tabs
-	def schrijf_model(self):
-		ws = self.ws_model
-		self._kop(ws, labels.TITLE_MODEL, "model")
-		self._schrijf_scenariokiezer(ws)
-		self._schrijf_tijdlijn(ws)
-		self._schrijf_ai_blokken(ws)
-		self._schrijf_actief(ws)
-		self._schrijf_rijen(ws, self.model_specs, "model")
-		self._voet(ws, self.model_einde + 1)
+	def _tekstbreedtes(self, ws):
 		for kolom in (self.kol.rationale, self.kol.source):
 			ws.column_dimensions[get_column_letter(kolom)].width = 60
 		ws.column_dimensions[get_column_letter(self.kol.confidence)].width = 10
 		ws.column_dimensions[get_column_letter(self.kol.flag)].width = 60
 		ws.column_dimensions[get_column_letter(self.kol.overrides)].width = 9
-		ws.sheet_properties.outlinePr.summaryBelow = False
+
+	def schrijf_inputs(self):
+		ws = self.ws_inp
+		self._kop(ws, labels.TITLE_INPUTS, "inp")
+		self._schrijf_scenariokiezer(ws)
+		self._schrijf_transactie(ws)
+		self._schrijf_ledger(ws)
+		self._schrijf_ai_blokken(ws)
+		self._voet(ws, self.inp_einde + 1)
+		self._tekstbreedtes(ws)
+		ws.sheet_properties.outlinePr.summaryBelow = True  # the [+] sits on the 'Used' row below its group
+
+	def _schrijf_transactie(self, ws):
+		ri = self.r["inp"]
+		self._sectie(ws, self.invoer_start, labels.SECTION_INPUTS)
+		for groep, (kop, laatste) in self.invoer_groepen.items():
+			cel = ws.cell(row=kop, column=1, value=labels.INPUT_GROUPS[groep])
+			cel.font = stijl.lettertype(vet=True, onderstreept=True)
+			if groep in INGEKLAPTE_GROEPEN:
+				for nr in range(kop + 1, laatste + 1):
+					ws.row_dimensions[nr].outlineLevel = 1
+					ws.row_dimensions[nr].hidden = True
+				ws.row_dimensions[laatste + 1].collapsed = True
+		for _, naam, waarde, fmt in self.invoer:
+			nr = ri[naam]
+			self._label(ws, nr, labels.INPUT_LABELS[naam])
+			self._zet(ws, nr, 3, waarde, fmt)
+		notitie = ws.cell(
+			row=ri["Senior_Rate"], column=4, value=labels.SENIOR_MARKET_NOTE.format(name=self.rij.get("Senior_Type", "-"))
+		)
+		notitie.font = stijl.lettertype(cursief=True, grootte=8)
+
+	def schrijf_model(self):
+		ws = self.ws_model
+		self._kop(ws, labels.TITLE_MODEL, "model")
+		self._schrijf_tijdlijn(ws)
+		self._schrijf_actief(ws)
+		self._schrijf_rijen(ws, self.model_specs, "model")
+		self._voet(ws, self.model_einde + 1)
+		self._tekstbreedtes(ws)
 
 	def _enkelvoudig(self, ws, specs, titel, start):
 		self._sectie(ws, start, titel)
@@ -1224,7 +1296,7 @@ class Bouwer:
 			cel.font = stijl.lettertype(grootte=8)
 		if not self.ledger:
 			ws.cell(row=self.ledger_eerste, column=1, value=labels.LEDGER_EMPTY).font = stijl.lettertype(cursief=True)
-		totaal = self.r["lbo"]["ledger_total"]
+		totaal = self.r["inp"]["ledger_total"]
 		self._label(ws, totaal, labels.LEDGER_TOTAL, vet=True)
 		laatste = self.ledger_eerste + max(len(self.ledger), 1) - 1
 		self._zet(ws, totaal, 3, f"=SUM(G{self.ledger_eerste}:G{laatste})", stijl.FMT_BEDRAG, vet=True)
@@ -1233,13 +1305,6 @@ class Bouwer:
 	def schrijf_lbo(self):
 		ws = self.ws_lbo
 		self._kop(ws, labels.TITLE_LBO, "lbo")
-		self._sectie(ws, HOOFD + 1, labels.SECTION_INPUTS)
-		for index, (naam, waarde, fmt) in enumerate(self.invoer):
-			nr = self.invoer_start + index
-			self._label(ws, nr, labels.INPUT_LABELS[naam])
-			self._zet(ws, nr, 3, waarde, fmt)
-
-		self._schrijf_ledger(ws)
 		self._enkelvoudig(ws, self.brug, labels.SECTION_BRIDGE, self.brug_start)
 		self._enkelvoudig(ws, self.su, labels.SECTION_SU, self.su_start)
 		self._schrijf_rijen(ws, self.lbo_specs, "lbo")
@@ -1372,7 +1437,7 @@ class Bouwer:
 		nr += 1
 
 		self._label(ws, nr, labels.OVERRIDES_ACTIVE, vet=True)
-		som = "+".join(f"{ZIJDE_MODEL}{cel}" for cel in self.override_cellen)
+		som = "+".join(f"{ZIJDE_INP}{cel}" for cel in self.override_cellen)
 		self._zet(ws, nr, 3, f'=IF({som}>0,"{labels.YES}","{labels.NO}")', "@")
 		ws.cell(row=nr, column=4, value=labels.OVERRIDES_NOTE).font = stijl.lettertype(cursief=True)
 		self.overrides_cel = f"C{nr}"
@@ -1568,6 +1633,7 @@ class Bouwer:
 		"""The addresses of the key cells, for the reconciliation test."""
 		return {
 			"rijen": self.r,
+			"bladen": {"model": labels.TAB_MODEL, "lbo": labels.TAB_LBO, "inp": labels.TAB_INPUTS},
 			"kolommen": {
 				"jaren": [get_column_letter(kolom) for kolom in self.kol.jaren],
 				"closing": get_column_letter(self.kol.closing),
@@ -1581,8 +1647,10 @@ class Bouwer:
 def bouw_werkboek(rij, historiek):
 	"""Builds the full company workbook. Returns the workbook and the address map."""
 	bouwer = Bouwer(rij, historiek)
+	bouwer._plan_inputs()
 	bouwer._plan_model()
 	bouwer._plan_lbo()
+	bouwer.schrijf_inputs()
 	bouwer.schrijf_model()
 	bouwer.schrijf_lbo()
 	bouwer.schrijf_samenvatting()
@@ -1594,7 +1662,7 @@ def bouw_lege_fiche(rij, historiek):
 	"""A company without a calculable LBO: the message, the actuals and the text blocks."""
 	bouwer = Bouwer(rij, historiek)
 	ws = bouwer.ws_samenvatting
-	for naam in (labels.TAB_MODEL, labels.TAB_LBO):
+	for naam in (labels.TAB_INPUTS, labels.TAB_MODEL, labels.TAB_LBO):
 		del bouwer.wb[naam]
 	ws.sheet_view.showGridLines = False
 	ws.column_dimensions["A"].width = 52

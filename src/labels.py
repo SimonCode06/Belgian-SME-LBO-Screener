@@ -347,9 +347,11 @@ UNKNOWN_COMPANY = "Unknown_Company"
 
 TAB_OVERVIEW = "Executive Summary"
 TAB_SUMMARY = "Executive Summary"
+TAB_INPUTS = "Inputs & Assumptions"
 TAB_MODEL = "3-Statement Model"
 TAB_LBO = "LBO Analysis"
 
+TITLE_INPUTS = "INPUTS & ASSUMPTIONS"
 TITLE_MODEL = "3-STATEMENT MODEL"
 TITLE_LBO = "LBO ANALYSIS"
 TITLE_SUMMARY = "EXECUTIVE SUMMARY"
@@ -374,11 +376,24 @@ LEGEND_INPUT = "Blue: hardcoded input, AI proposal, historical NBB value"
 LEGEND_FORMULA = "Black: formula"
 LEGEND_LINK = "Green: direct link to another tab"
 LEGEND_OVERRIDE = "Yellow: override cell, leave empty to keep the AI proposal"
+LEGEND_GROUPS = "Click [+] left of a 'Used' row to show the AI proposal and its override cell"
+INPUT_GROUPS = {
+	"valuation": "Valuation",
+	"senior": "Senior Debt",
+	"vendor": "Vendor Loan",
+	"rcf": "Revolving Credit Facility",
+	"fees": "Fees, Cash and Dividends",
+	"tax": "Tax",
+	"covenants": "Covenants",
+	"working": "Working Capital and Minimum Cash",
+	"settings": "Model Settings",
+}
+SENIOR_MARKET_NOTE = "Market for deal size: {name}"
 
 SECTION_SCENARIO = "SCENARIO SELECTOR"
 SECTION_TIMELINE = "TIMELINE"
 SECTION_AI = "ASSUMPTIONS: {scenario}"
-SECTION_ACTIVE = "ACTIVE ASSUMPTIONS"
+SECTION_ACTIVE = "ACTIVE ASSUMPTIONS (FROM INPUTS & ASSUMPTIONS)"
 SECTION_BUILD = "OPERATING BUILD"
 SECTION_IS = "INCOME STATEMENT"
 SECTION_TAX = "INCOME TAX CALCULATION"

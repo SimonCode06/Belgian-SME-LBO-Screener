@@ -260,7 +260,7 @@ def test_company_workbook_shows_the_screening_scenarios_and_snapshot(mappen, fil
 	app.main([])
 	pad = next(p for p in config.OUTPUT_FOLDER.glob("LBO_Model_*.xlsx"))
 	wb = openpyxl.load_workbook(pad)
-	model = wb[labels.TAB_MODEL]
+	model = wb[labels.TAB_INPUTS]
 	keuzelijst = model.data_validations.dataValidation[0].formula1
 	for scenario in assumpties.MODEL_SCENARIOS:
 		assert assumpties.scenario_label(scenario) in keuzelijst

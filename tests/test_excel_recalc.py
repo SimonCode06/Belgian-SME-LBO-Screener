@@ -42,13 +42,14 @@ class Open:
 		self.wb = excel.Workbooks.Open(str(pad))
 		self.model = self.wb.Worksheets(labels.TAB_MODEL)
 		self.lbo = self.wb.Worksheets(labels.TAB_LBO)
+		self.inp = self.wb.Worksheets(labels.TAB_INPUTS)
 		self.samenvatting = self.wb.Worksheets(labels.TAB_SUMMARY)
 
 	def reken(self):
 		self.excel.CalculateFull()
 
 	def scenario(self, naam):
-		self.model.Range(self.kaart["scenario_cel"]).Value = naam
+		self.inp.Range(self.kaart["scenario_cel"]).Value = naam
 		self.reken()
 
 	def rij(self, blad, sleutel):
@@ -64,12 +65,12 @@ class Open:
 		return self.samenvatting.Range(self.kaart["checks_cel"]).Value
 
 	def override(self, scenario, driver, jaar, waarde):
-		nr = self.kaart["rijen"]["model"][f"ov_{scenario}_{driver}"]
-		self.model.Range(f"{self.kaart['kolommen']['jaren'][jaar - 1]}{nr}").Value = waarde
+		nr = self.kaart["rijen"]["inp"][f"ov_{scenario}_{driver}"]
+		self.inp.Range(f"{self.kaart['kolommen']['jaren'][jaar - 1]}{nr}").Value = waarde
 
 	def sluit(self):
 		self.wb.Close(SaveChanges=False)
-		self.wb = self.model = self.lbo = self.samenvatting = None
+		self.wb = self.model = self.lbo = self.inp = self.samenvatting = None
 
 
 @pytest.fixture
@@ -168,7 +169,7 @@ def test_the_comparison_itself_detects_a_difference(excel, tmp_path, rij, filing
 	df_rij, pad, kaart = bouw(tmp_path, cijfers, pack, filings)
 	open_wb = Open(excel, pad, kaart)
 	try:
-		open_wb.lbo.Range("Tax_Rate").Value = config.LBO_TAX_RATE + 0.05
+		open_wb.wb.Names("Tax_Rate").RefersToRange.Value = config.LBO_TAX_RATE + 0.05
 		with pytest.raises(AssertionError):
 			vergelijk_scenario(open_wb, df_rij, "base")
 	finally:
@@ -247,7 +248,7 @@ def test_fallback_with_little_history_reconciles(excel, tmp_path, filings):
 	try:
 		for scenario in assumpties.MODEL_SCENARIOS:
 			vergelijk_scenario(open_wb, rij, scenario)
-		rationale = open_wb.model.Cells(kaart["rijen"]["model"]["ai_base_prijsgroei"], 10).Value
+		rationale = open_wb.inp.Cells(kaart["rijen"]["inp"]["u_base_prijsgroei"], 10).Value
 		assert rationale == labels.ASSUMPTIONS_FALLBACK_HISTORY
 	finally:
 		open_wb.sluit()
@@ -301,30 +302,38 @@ def test_company_without_lbo_gets_a_summary_tab_only(tmp_path, cijfers, filings,
 	assert boek.sheetnames == [labels.TAB_SUMMARY]
 	assert "No LBO projection possible" in str(boek[labels.TAB_SUMMARY]["A3"].value)
 	volledig = openpyxl.load_workbook(next(pad for pad in paden if "Testco" in pad.name))
-	assert volledig.sheetnames == [labels.TAB_SUMMARY, labels.TAB_MODEL, labels.TAB_LBO]
+	assert volledig.sheetnames == [labels.TAB_SUMMARY, labels.TAB_INPUTS, labels.TAB_MODEL, labels.TAB_LBO]
 
 
 def test_workbook_standard(rij, tmp_path, filings):
 	pack, cijfers = rij
 	_, pad, kaart = bouw(tmp_path, cijfers, pack, filings)
 	boek = openpyxl.load_workbook(pad)
-	model, lbo = boek[labels.TAB_MODEL], boek[labels.TAB_LBO]
-	rijen = kaart["rijen"]["model"]
+	model, lbo, inp = boek[labels.TAB_MODEL], boek[labels.TAB_LBO], boek[labels.TAB_INPUTS]
+	rijen, ri = kaart["rijen"]["model"], kaart["rijen"]["inp"]
 	eerste = kaart["kolommen"]["jaren"][0]
 
-	assert model.sheet_view.showGridLines is False
+	assert model.sheet_view.showGridLines is False and inp.sheet_view.showGridLines is False
 	assert model.freeze_panes == "B5"
-	assert model[f"{eerste}{rijen['ai_base_prijsgroei']}"].font.color.rgb.endswith("0000FF")
-	override = model[f"{eerste}{rijen['ov_base_prijsgroei']}"]
+	assert inp[f"{eerste}{ri['ai_base_prijsgroei']}"].font.color.rgb.endswith("0000FF")
+	override = inp[f"{eerste}{ri['ov_base_prijsgroei']}"]
 	assert override.value is None
 	assert override.fill.fgColor.rgb.endswith("FFF2CC") and override.font.color.rgb.endswith("0000FF")
 	assert model[f"{eerste}{rijen['rev']}"].font.color.rgb.endswith("000000")
 	assert model[f"{eerste}{rijen['int_exp']}"].font.color.rgb.endswith("006100")
 	assert model[f"{eerste}{rijen['rev']}"].number_format == '#,##0,_);(#,##0,);"-"_)'
 	assert model[f"{eerste}{rijen['a_prijsgroei']}"].number_format == "0.0%"
-	assert 0 < model[f"{eerste}{rijen['ai_base_prijsgroei']}"].value < 1
+	assert 0 < inp[f"{eerste}{ri['ai_base_prijsgroei']}"].value < 1
 	assert model["A1"].fill.fgColor.rgb.endswith("1F3864")
-	assert "Scenario" in boek.defined_names and len(model.data_validations.dataValidation) == 1
+	assert "Scenario" in boek.defined_names and len(inp.data_validations.dataValidation) == 1
+	# AI proposal and override rows are grouped and collapsed; the used row stays visible
+	for sleutel in ("ai_base_prijsgroei", "ov_base_prijsgroei"):
+		assert inp.row_dimensions[ri[sleutel]].hidden and inp.row_dimensions[ri[sleutel]].outlineLevel == 1
+	assert not inp.row_dimensions[ri["u_base_prijsgroei"]].hidden
+	# Every named input lives on the inputs tab, and the calculation tabs hold no hardcoded input
+	for naam in ("Entry_Multiple", "Senior_Rate", "Tax_Rate", "Scenario", "Ledger_Total"):
+		assert boek.defined_names[naam].attr_text.startswith("'" + labels.TAB_INPUTS + "'!"), naam
+	assert lbo[f"{eerste}{kaart['rijen']['lbo']['c_dscr_min']}"].font.color.rgb.endswith("006100")
 	assert lbo.conditional_formatting and boek.calculation.fullCalcOnLoad
 	assert boek.calculation.iterate in (None, False)
 
@@ -351,9 +360,9 @@ def test_ledger_switch_flows_through_excel(excel, tmp_path, rij, filings):
 		entry = open_wb.cel("lbo", "entry_ebitda_rij")
 		assert entry == pytest.approx(df_rij["Genormaliseerde_EBITDA"], abs=TOLERANTIE_EUR)
 		schakelaar = next(
-			nr for nr in range(1, 400) if str(open_wb.lbo.Range(f"A{nr}").Value or "").startswith("A1 ")
+			nr for nr in range(1, 400) if str(open_wb.inp.Range(f"A{nr}").Value or "").startswith("A1 ")
 		)
-		open_wb.lbo.Range(f"F{schakelaar}").Value = 0
+		open_wb.inp.Range(f"F{schakelaar}").Value = 0
 		open_wb.reken()
 		assert open_wb.cel("lbo", "entry_ebitda_rij") == pytest.approx(entry - 100_000.0, abs=TOLERANTIE_EUR)
 		assert open_wb.checks() == labels.CHECK_OK
