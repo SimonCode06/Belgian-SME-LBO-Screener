@@ -48,6 +48,36 @@ LBO_ATP_MAX_MULTIPLE = 12.0
 LBO_ATP_IRR_PRECISIE_PP = 0.05   # De IRR bij de gevonden multiple ligt zo dicht bij de doel-IRR
 LBO_MIN_SPONSOR_EQUITY_PCT = 0.30  # Minimale inbreng van de sponsor (deel van prijs + kosten): begrenst de schuld
 
+# Scorecard 0-100 (scorecard.py). Elke component scoort lineair tussen de 0-drempel en de 100-drempel.
+# Startwaarden: ijk ze op een reeks bedrijven (stap 5.6). De gewichten tellen op tot 1.
+SCORE_GEWICHTEN = {
+	"debt_capacity": 0.25,
+	"headroom": 0.20,
+	"cashflow": 0.20,
+	"trend": 0.15,
+	"governance": 0.10,
+	"data": 0.10,
+}
+SCORE_DEBT_CAPACITY = (0.5, 3.0)        # x EBITDA (Screening Stress): 0 punten, 100 punten
+SCORE_HEADROOM_PCT = (-30.0, 20.0)      # Max EV (doel-IRR) tegenover de indicatieve EV
+SCORE_CASH_CONVERSIE_PCT = (50.0, 90.0) # (EBITDA - capex) / EBITDA, gemiddeld over de historiek
+SCORE_MARGE_SCHOMMELING_PP = (5.0, 1.0) # max - min EBITDA-marge over de historiek
+SCORE_CAGR_PCT = (-10.0, 10.0)          # historische EBITDA- en omzet-CAGR
+SCORE_TREND_GEWICHT_EBITDA = 2 / 3      # rest: omzet-CAGR
+SCORE_STRAF_HOGE_VLAG = 40              # governance: punten af per hoge vlag (2 of meer hoge: 0)
+SCORE_STRAF_MIDDEL_VLAG = 15
+SCORE_DATA_GEDEELTELIJK = 40            # datakwaliteit bij 'Partial'
+SCORE_DATA_VOLLEDIG = 80                # 'Complete' zonder geverifieerde citaten; + tot 20 voor geverifieerde citaten
+SCORE_DATA_GEEN_CITATEN = 90            # 'Complete' zonder AI-tekst om te controleren
+
+# Robuustheid: 18 doorrekeningen op de screening case. Slaagt als Screening Stress de covenants haalt en
+# Screening Base de doel-IRR. Forecast-EBITDA -10% / 0 / +10% bij een prijs en schuld op de gerapporteerde
+# EBITDA (quality-of-earnings-risico), instapmultiple -0,5x / 0 /
+# +0,5x tegenover de tabel (exit blijft de tabel), senior = schuldcapaciteit of capaciteit - 0,5x.
+ROBUUST_EBITDA = (-0.10, 0.0, 0.10)
+ROBUUST_MULTIPLE = (-0.5, 0.0, 0.5)
+ROBUUST_SENIOR_KORTING = (0.0, 0.5)
+
 # Financiering
 LBO_SENIOR_RENTE = 0.065         # Rente op de amortiserende senior lening (6,5% p.j.)
 LBO_SENIOR_LOOPTIJD_JAAR = 7     # Lineaire aflossing van de senior lening

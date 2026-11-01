@@ -261,6 +261,22 @@ ASSUMPTION_FLAG_EBITDA_CAGR = (
 )
 DD_LINKED_TO = "tests"
 ASSUMPTION_LEDGER = "Lowered by {pp:.2f} pp for the approved EBITDA adjustments (ledger)"
+SCORE_LABELS = {
+	"debt_capacity": "Debt Capacity",
+	"headroom": "Price Headroom",
+	"cashflow": "Cash Flow Quality",
+	"trend": "Trend",
+	"governance": "Governance & Risk",
+	"data": "Data Quality",
+}
+SCORE_REASON_CAPACITY = "{x:.2f}x in Screening Stress, binding: {binding}"
+SCORE_REASON_HEADROOM = "{pct:+.1f}%: max {multiple:.2f}x at the target IRR vs {indicative:.2f}x indicative"
+SCORE_REASON_HEADROOM_CAP = "above the search range"
+SCORE_REASON_CASHFLOW = "cash conversion {conversion:.0f}%, EBITDA margin swing {swing:.1f} pp"
+SCORE_REASON_TREND = "EBITDA CAGR {ebitda:+.1f}%, revenue CAGR {revenue:+.1f}%"
+SCORE_REASON_GOVERNANCE = "{high} high and {medium} medium red flags"
+SCORE_REASON_DATA = "complete, {verified} of {total} quotes verified"
+SCORE_REASON_DATA_NO_QUOTES = "complete, no AI text to verify"
 CAPACITY_OK = "OK"
 CAPACITY_NONE = "No debt capacity"
 CAPACITY_NA = "N/A"
@@ -799,6 +815,11 @@ COLUMN_LABELS = {
 	"Run_Manifest": "Run Manifest",
 	"Aantal_Hoge_Vlaggen": "Red Flags: High (Counted)",
 	"Dealtype": "Deal Type",
+	"Score": "Screening Score (0-100)",
+	"Score_Toelichting": "Score: Components and Reasons",
+	"Robuustheid_Pct": "Robustness (Share of 18 Runs Passing)",
+	"Hist_Cash_Conversion_Pct": "Cash Conversion (Historical Average)",
+	"Hist_Marge_Schommeling_pp": "EBITDA Margin Swing (Historical, pp)",
 	"Dealtype_Toelichting": "Deal Type: Note",
 	"Aantal_Middel_Vlaggen": "Red Flags: Medium (Counted)",
 	"Eigendom": "Ownership",

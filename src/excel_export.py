@@ -47,6 +47,8 @@ OVERZICHT_KOLOMMEN = [
 	("Boekjaar", labels.GROUP_IDENTIFICATION, 10),
 	("Schema_Type", labels.GROUP_IDENTIFICATION, 12),
 	("LBO_Status", labels.GROUP_IDENTIFICATION, 36),
+	("Score", labels.GROUP_IDENTIFICATION, 9),
+	("Robuustheid_Pct", labels.GROUP_IDENTIFICATION, 10),
 	("Data_Volledigheid", labels.GROUP_IDENTIFICATION, 34),
 	("Dealtype", labels.GROUP_IDENTIFICATION, 12),
 	("Eigendom", labels.GROUP_IDENTIFICATION, 34),
@@ -103,6 +105,7 @@ TEKST_KOLOMMEN = {
 	"Red_Flags",
 	"Eigendom",
 	"Dealtype_Toelichting",
+	"Score_Toelichting",
 	"Kwalitatief_LBO_Oordeel",
 	"AI_Business_Model",
 }
@@ -132,6 +135,8 @@ PCT_KOLOMMEN = {
 	"LBO_Screening_IRR_Pct",
 	"LBO_Stress_IRR_Pct",
 	"ATP_IRR_Pct",
+	"Robuustheid_Pct",
+	"Hist_Cash_Conversion_Pct",
 	"ATP_Headroom_Pct",
 	"ATP_AI_Headroom_Pct",
 	"LBO_IRR_Exact_Pct",
@@ -139,7 +144,7 @@ PCT_KOLOMMEN = {
 	"LBO_EBITDA_Marge_Exit_Pct",
 }
 DAGEN_KOLOMMEN = {"Driver_DSO_Excl_BTW", "Driver_DSO", "Driver_DIO", "Driver_DPO", "Driver_Dagen_Vooruitbetaling"}
-GETAL_KOLOMMEN = {"NWC_Peg_Jaren", "Capex_Aantal_Jaren", "Driver_Aantal_Jaren", "VTE", "LBO_Duur_Jaren", "Boekjaar_Maanden", "Boekjaar_Maanden_Vorig_Jaar"}
+GETAL_KOLOMMEN = {"Score", "Hist_Marge_Schommeling_pp", "NWC_Peg_Jaren", "Capex_Aantal_Jaren", "Driver_Aantal_Jaren", "VTE", "LBO_Duur_Jaren", "Boekjaar_Maanden", "Boekjaar_Maanden_Vorig_Jaar"}
 MULT_KOLOMMEN = {
 	"Instap_Multiple",
 	"Senior_Multiple",
@@ -161,7 +166,7 @@ MULT_KOLOMMEN = {
 GEEN_BEDRAG_KOLOMMEN = {"Boekjaar", "Boekjaar_Begin", "Boekjaar_Einde", "LBO_Closing_Datum", "Ondernemingsnummer"}
 OBJECT_KOLOMMEN = [
 	"LBO_Jaren", "LBO_Integriteit", "LBO_Scenarios", "LBO_Assumpties", "LBO_Assumptie_Vlaggen", "LBO_Driver_Pack",
-	"AI_Normalisaties", "LBO_Adjustments", "AI_Red_Flags", "Red_Flag_Lijst", "AI_Eigendom", "AI_Buitenbalans", "AI_Investment_Thesis", "AI_DD_Vragen",
+	"AI_Normalisaties", "LBO_Adjustments", "AI_Red_Flags", "Red_Flag_Lijst", "Score_Componenten", "Robuustheid_Runs", "AI_Eigendom", "AI_Buitenbalans", "AI_Investment_Thesis", "AI_DD_Vragen",
 ]
 
 

@@ -250,6 +250,16 @@ def met_ledger(pack, ledger_ebitda, omzet_0):
 	return nieuw
 
 
+def verschuif_ebitda(drivers, omzet_0, personeel_0, deel):
+	"""The same drivers with EBITDA (1 + deel) x as high in every year, through Other Opex. A copy."""
+	_, marges = impliciete_groei_en_marge(drivers, omzet_0, personeel_0)
+	nieuw = {sleutel: {**voorstel, "waarden": list(voorstel["waarden"])} for sleutel, voorstel in drivers.items()}
+	nieuw["overige_kosten_pct"]["waarden"] = [
+		waarde - deel * abs(marge) for waarde, marge in zip(drivers["overige_kosten_pct"]["waarden"], marges)
+	]
+	return nieuw
+
+
 def heeft_lege_waarden(pack):
 	return any(
 		math.isnan(waarde)

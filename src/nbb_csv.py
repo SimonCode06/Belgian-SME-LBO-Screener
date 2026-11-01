@@ -536,6 +536,20 @@ def _nwc_peg(reeks, omzet_code):
 	}
 
 
+def _kasstroomkwaliteit(reeks, omzet_code):
+	"""Gemiddelde cash conversion (EBITDA - capex) / EBITDA en de schommeling van de EBITDA-marge (max - min, pp)."""
+	conversies, marges = [], []
+	for index, jaar in enumerate(reeks):
+		regels = _modelregels(jaar, reeks[index - 1] if index else None, omzet_code)
+		for lijst, veld in ((conversies, "Cash_Conversion_Pct"), (marges, "EBITDA_Marge_Pct")):
+			if not math.isnan(regels[veld]):
+				lijst.append(regels[veld])
+	return {
+		"Hist_Cash_Conversion_Pct": sum(conversies) / len(conversies) if conversies else NIET_BESCHIKBAAR,
+		"Hist_Marge_Schommeling_pp": max(marges) - min(marges) if len(marges) >= 2 else NIET_BESCHIKBAAR,
+	}
+
+
 def _opmaak_nummer(nummer):
 	return f"{nummer[:4]}.{nummer[4:7]}.{nummer[7:]}" if len(nummer) == 10 else nummer
 
@@ -596,6 +610,7 @@ def bouw_cijfers(neerleggingen):
 		**_bereken_drivers(reeks, omzet_code),
 		**_openingsposten(huidig),
 		**_nwc_peg(reeks, omzet_code),
+		**_kasstroomkwaliteit(reeks, omzet_code),
 		"Data_Volledigheid": _data_volledigheid(huidig, vorig, omzet_code, len(reeks)),
 		"Check_Data": labels.CHECK_OK if not fouten else labels.check_review(fouten),
 		"Cijfer_Flags": "; ".join(signalen),

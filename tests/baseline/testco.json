@@ -27,6 +27,7 @@
   "LBO_Status": "NO-GO (New Debt Not Serviceable)",
   "Minimum_Operationele_Cash": 260000.0,
   "Net_Debt": -900000.0,
+  "Robuustheid_Pct": 66.66666666666666,
   "Scenarios": {
     "base": {
       "Indicatieve_IRR_Pct": 22.3,
@@ -69,5 +70,6 @@
       "LBO_Laagste_Rentedekking": 7.15
     }
   },
+  "Score": 83.66605908636996,
   "Senior_Multiple": 2.425
 }

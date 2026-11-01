@@ -65,6 +65,8 @@ RIJVELDEN = (
 	"ATP_Headroom_Pct",
 	"ATP_Status",
 	"ATP_AI_Max_Entry_Multiple",
+	"Score",
+	"Robuustheid_Pct",
 )
 # Velden per scenario (base, downside, upside)
 SCENARIOVELDEN = (

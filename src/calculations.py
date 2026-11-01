@@ -12,7 +12,7 @@ naar de equity value voor de verkoper en naar de bediening van de nieuwe schuld.
 """
 import pandas as pd
 
-from . import assumpties, config, labels, normalisaties, structurering, vlaggen
+from . import assumpties, config, labels, normalisaties, scorecard, structurering, vlaggen
 from .lbo_model import bereken_scenarios, kies_multiples, net_debt
 
 NIET_BESCHIKBAAR = float("nan")  # verschijnt als lege cel in Excel, niet als 0%
@@ -325,6 +325,10 @@ def bouw_dataframe(resultaten):
     df["Aantal_Hoge_Vlaggen"] = [vlaggen.tel(lijst, "hoog") for lijst in df["Red_Flag_Lijst"]]
     df["Aantal_Middel_Vlaggen"] = [vlaggen.tel(lijst, "middel") for lijst in df["Red_Flag_Lijst"]]
 
+    # Phase 5.3-5.4: scorecard and robustness grid, on the screening case only
+    score = pd.DataFrame([scorecard.analyseer(r) for _, r in df.iterrows()], index=df.index)
+    df = pd.concat([df, score], axis=1)
+
     def bepaal_status(rij):
         if rij["Check_Data"] != labels.CHECK_OK:
             return labels.STATUS_REVIEW_DATA
@@ -539,6 +543,13 @@ def bouw_dataframe(resultaten):
         "Eigendom",
         "Dealtype",
         "Dealtype_Toelichting",
+        "Score",
+        "Score_Toelichting",
+        "Score_Componenten",
+        "Robuustheid_Pct",
+        "Robuustheid_Runs",
+        "Hist_Cash_Conversion_Pct",
+        "Hist_Marge_Schommeling_pp",
         "Kwalitatief_LBO_Oordeel",
         "AI_Business_Model",
         "AI_Normalisaties",
