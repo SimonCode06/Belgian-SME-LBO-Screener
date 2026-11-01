@@ -344,6 +344,9 @@ SECTION_SCHEDULES = "FIXED ASSETS, GOODWILL AND FINANCING FEES"
 SECTION_CHECKS = "MODEL INTEGRITY CHECKS"
 SECTION_INPUTS = "TRANSACTION INPUTS"
 SECTION_BRIDGE = "EV-TO-EQUITY BRIDGE"
+SECTION_STRUCTURE = "DEBT CAPACITY & ABILITY-TO-PAY"
+STRUCTURE_NOTE = "Computed in Python on the screening case (bisection); the last line is live"
+STRUCTURE_SELECT_STRESS = "Select 'Screening Stress' in the scenario selector"
 SECTION_LEDGER = "EBITDA ADJUSTMENTS (LEDGER): SET 'APPROVED' TO 1 TO INCLUDE AN ITEM"
 LEDGER_HEADERS = ("Amount (EUR)", "Market Level", "Verified (1/0)", "Approved (1/0)", "EBITDA Effect", "Description | Source | Quote")
 LEDGER_EMPTY = "No adjustments proposed"
@@ -523,6 +526,17 @@ ROW_LABELS = {
 	"w_div": "Dividends",
 	"w_end": "Closing Cash per Waterfall",
 	"res_close": "Distributable Reserves (Closing)",
+	"dc_multiple": "Debt Capacity: Senior Multiple (x EBITDA, Screening Stress)",
+	"dc_eur": "Debt Capacity: Senior Debt (EUR)",
+	"dc_binding": "Debt Capacity: Binding Constraint",
+	"atp_senior": "Ability-to-Pay: Senior Multiple Used",
+	"atp_multiple": "Ability-to-Pay: Max Entry Multiple at Target IRR (Screening Base)",
+	"atp_ev": "Ability-to-Pay: Max EV",
+	"atp_headroom": "Ability-to-Pay: Headroom vs Indicative EV",
+	"atp_equity": "Ability-to-Pay: Max Equity Price",
+	"atp_ai_multiple": "Ability-to-Pay on the AI Base: Max Entry Multiple",
+	"atp_ai_headroom": "Ability-to-Pay on the AI Base: Headroom vs Indicative EV",
+	"dc_live": "Current Structure Meets the Bank Tests in Screening Stress",
 	"c_cfads": "CFADS (EBITDA - Tax - Capex - Change in NWC and Other Items)",
 	"c_icr": "Interest Coverage (EBITDA / Senior + RCF Interest and Fees)",
 	"c_icr_min": "Minimum Interest Coverage Ratio",
@@ -607,6 +621,7 @@ GROUP_IDENTIFICATION = "IDENTIFICATION & ASSESSMENT"
 GROUP_TRENDS = "MULTI-YEAR TREND & MARGINS"
 GROUP_BRIDGE = "EV-TO-EQUITY BRIDGE & NWC"
 GROUP_RETURNS = "LBO VALUATION & RETURNS (5Y)"
+GROUP_STRUCTURE = "DEBT CAPACITY & ABILITY-TO-PAY (SCREENING CASE)"
 GROUP_SCREENING = "SCREENING CASE (RULE-BASED, NOT YET IN THE ASSESSMENT)"
 
 # Column headers of the overview workbook, by internal key

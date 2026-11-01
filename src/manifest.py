@@ -83,6 +83,10 @@ def bedrijf_regel(rij, invoer):
 		"screening_irr_pct": _getal(rij["LBO_Screening_IRR_Pct"]),
 		"stress_irr_pct": _getal(rij["LBO_Stress_IRR_Pct"]),
 		"stress_convenanten": rij["LBO_Stress_Convenanten"],
+		"debt_capacity_x": _getal(rij.get("Debt_Capacity_Multiple")),
+		"debt_capacity_bindend": rij.get("Debt_Capacity_Bindend", ""),
+		"max_entry_multiple": _getal(rij.get("ATP_Max_Entry_Multiple")),
+		"headroom_pct": _getal(rij.get("ATP_Headroom_Pct")),
 	}
 
 

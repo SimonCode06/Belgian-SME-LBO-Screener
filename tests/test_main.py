@@ -237,7 +237,10 @@ def test_a_run_writes_the_workbooks_and_a_manifest(mappen):
 	assert sorted(bedrijf["csv"]) == ["Test_JR2022.csv", "Test_JR2023.csv", "Test_JR2024.csv"]
 	assert all(len(waarde) == 64 for waarde in bedrijf["csv"].values())
 	assert bedrijf["pdf"] is None and bedrijf["snapshot"] == "-"
-	for veld in ("status", "ai_irr_pct", "screening_irr_pct", "stress_irr_pct", "stress_convenanten", "gemini_model"):
+	for veld in (
+		"status", "ai_irr_pct", "screening_irr_pct", "stress_irr_pct", "stress_convenanten", "gemini_model",
+		"debt_capacity_x", "max_entry_multiple", "headroom_pct",
+	):
 		assert veld in bedrijf, veld
 	assert bedrijf["screening_irr_pct"] == bedrijf["ai_irr_pct"]  # without AI both are rule-based
 

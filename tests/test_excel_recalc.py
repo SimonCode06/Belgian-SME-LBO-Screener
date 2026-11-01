@@ -359,3 +359,19 @@ def test_ledger_switch_flows_through_excel(excel, tmp_path, rij, filings):
 		assert open_wb.checks() == labels.CHECK_OK
 	finally:
 		open_wb.sluit()
+
+
+def test_live_covenant_cell_agrees_with_the_debt_capacity(excel, tmp_path, rij, filings):
+	"""At the capacity found by Python the live cell says YES in Screening Stress; 0.1x above it says NO."""
+	pack, cijfers = rij
+	df_rij, pad, kaart = bouw(tmp_path, cijfers, pack, filings)
+	open_wb = Open(excel, pad, kaart)
+	try:
+		open_wb.scenario(assumpties.scenario_label("screening_stress"))
+		adres = open_wb.wb.Names("Senior_Multiple").RefersToRange
+		for multiple, verwacht in ((df_rij["Debt_Capacity_Multiple"], labels.YES), (df_rij["Debt_Capacity_Multiple"] + 0.1, labels.NO)):
+			adres.Value = float(multiple)
+			open_wb.reken()
+			assert open_wb.cel("lbo", "dc_live") == verwacht, multiple
+	finally:
+		open_wb.sluit()

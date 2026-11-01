@@ -96,3 +96,20 @@ def test_senior_debt_respects_the_minimum_sponsor_equity():
 	kosten = config.LBO_TRANSACTIEKOSTEN_PCT + config.LBO_FINANCIERINGSKOSTEN_PCT
 	sponsor = 5.0 * (1 + kosten) - senior - 0.5
 	assert sponsor == pytest.approx(config.LBO_MIN_SPONSOR_EQUITY_PCT * 5.0 * (1 + kosten))
+
+
+# --- 4.3 In the workbook ------------------------------------------------------------------
+
+
+def test_workbook_block_and_live_cell(rij, filings):
+	from src import excel_model
+	from src.nbb_csv import bouw_meerjaren
+
+	wb, kaart = excel_model.bouw_werkboek(rij, [jaar["Model"] for jaar in bouw_meerjaren(filings)])
+	ws = wb[labels.TAB_LBO]
+	rl = kaart["rijen"]["lbo"]
+	assert ws[f"C{rl['dc_multiple']}"].value == pytest.approx(rij["Debt_Capacity_Multiple"])
+	assert ws[f"C{rl['atp_multiple']}"].value == pytest.approx(rij["ATP_Max_Entry_Multiple"])
+	assert ws[f"C{rl['dc_binding']}"].value == rij["Debt_Capacity_Bindend"]
+	live = ws[f"C{rl['dc_live']}"].value
+	assert live.startswith('=IF(Scenario="Screening Stress"') and "Min_Cash" in live

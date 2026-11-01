@@ -587,6 +587,12 @@ def _net_debt_formule(c, doel):
 	)
 
 
+STRUCTUUR_RIJEN = (
+	"dc_multiple", "dc_eur", "dc_binding", "atp_senior", "atp_multiple", "atp_ev", "atp_headroom", "atp_equity",
+	"atp_ai_multiple", "atp_ai_headroom", "dc_live",
+)
+
+
 def _invoer(rij):
 	"""The transaction inputs: (name, value, format). All are blue, all live."""
 	bank = config.NET_DEBT_DEFINITIES["bank_covenant"]
@@ -835,6 +841,12 @@ class Bouwer:
 			"x_ebitda", "x_mult", "x_ev", "x_nd", "x_equity", "x_lev", "x_duration", "x_dates", "x_flows", "x_irr", "x_moic",
 			"x_covenants", "x_peak_lev", "x_min_dscr",
 		):
+			self.r["lbo"][sleutel] = rij_nr
+			rij_nr += 1
+		rij_nr += 1
+		self.structuur_start = rij_nr
+		rij_nr += 1
+		for sleutel in STRUCTUUR_RIJEN:
 			self.r["lbo"][sleutel] = rij_nr
 			rij_nr += 1
 		self.lbo_einde = rij_nr
@@ -1291,6 +1303,58 @@ class Bouwer:
 		self._zet(ws, rl["x_peak_lev"], 3, f"=MAX({jaren_k}{rl['c_lev']}:{k5}{rl['c_lev']})", stijl.FMT_MULT_2)
 		self._label(ws, rl["x_min_dscr"], labels.ROW_LABELS["x_min_dscr"])
 		self._zet(ws, rl["x_min_dscr"], 3, f"=MIN({jaren_k}{rl['c_dscr']}:{k5}{rl['c_dscr']})", stijl.FMT_MULT_2)
+		self._schrijf_structuur(ws)
+
+	def _schrijf_structuur(self, ws):
+		"""Debt capacity and ability-to-pay: Python results (bisection), plus one live covenant test."""
+		rij, rl = self.rij, self.r["lbo"]
+		self._sectie(ws, self.structuur_start, labels.SECTION_STRUCTURE)
+		ws.cell(row=self.structuur_start, column=6, value=labels.STRUCTURE_NOTE)
+
+		def getal(veld):
+			waarde = rij.get(veld)
+			return None if waarde is None or pd.isna(waarde) else float(waarde)
+
+		regels = [
+			("dc_multiple", getal("Debt_Capacity_Multiple"), stijl.FMT_MULT_2, rij.get("Debt_Capacity_Status", "")),
+			("dc_eur", getal("Debt_Capacity_EUR"), stijl.FMT_BEDRAG, None),
+			("dc_binding", rij.get("Debt_Capacity_Bindend") or "-", "@", None),
+			("atp_senior", getal("ATP_Senior_Multiple"), stijl.FMT_MULT_2, None),
+			("atp_multiple", getal("ATP_Max_Entry_Multiple"), stijl.FMT_MULT_2, rij.get("ATP_Status", "")),
+			("atp_ev", getal("ATP_Max_EV"), stijl.FMT_BEDRAG, None),
+			("atp_headroom", None if getal("ATP_Headroom_Pct") is None else getal("ATP_Headroom_Pct") / 100, stijl.FMT_PCT, None),
+			("atp_equity", getal("ATP_Max_Equity_Price"), stijl.FMT_BEDRAG, None),
+			("atp_ai_multiple", getal("ATP_AI_Max_Entry_Multiple"), stijl.FMT_MULT_2, rij.get("ATP_AI_Status", "")),
+			(
+				"atp_ai_headroom",
+				None if getal("ATP_AI_Headroom_Pct") is None else getal("ATP_AI_Headroom_Pct") / 100,
+				stijl.FMT_PCT,
+				None,
+			),
+		]
+		for sleutel, waarde, fmt, status in regels:
+			self._label(ws, rl[sleutel], labels.ROW_LABELS[sleutel])
+			if waarde is None:
+				waarde = status or "-"
+			self._zet(ws, rl[sleutel], 3, waarde, fmt, soort="invoer")
+			if status and status != labels.ATP_OK:
+				ws.cell(row=rl[sleutel], column=4, value=status).font = stijl.lettertype(cursief=True, grootte=8)
+
+		# Live: does the structure in the inputs (with overrides) pass the bank tests in Screening Stress?
+		k5 = get_column_letter(self.kol.laatste_jaar)
+		eerste = get_column_letter(self.kol.jaren[0])
+		cash = f"{ZIJDE_MODEL}{eerste}{self.r['model']['cash']}:{ZIJDE_MODEL}{k5}{self.r['model']['cash']}"
+		naam = assumpties.scenario_label("screening_stress")
+		test = (
+			f'AND(C{rl["x_covenants"]}="{labels.COVENANTS_OK}",MIN({cash})>=Min_Cash-Check_Tolerance,'
+			f'{k5}{rl["d_rcf"]}<=Check_Tolerance)'
+		)
+		self._label(ws, rl["dc_live"], labels.ROW_LABELS["dc_live"], vet=True)
+		self._zet(
+			ws, rl["dc_live"], 3,
+			f'=IF(Scenario="{naam}",IF({test},"{labels.YES}","{labels.NO}"),"{labels.STRUCTURE_SELECT_STRESS}")',
+			"@", vet=True,
+		)
 
 	def schrijf_samenvatting(self):
 		ws = self.ws_samenvatting
@@ -1352,6 +1416,9 @@ class Bouwer:
 			("x_peak_lev", f"={ZIJDE_LBO}C{rl['x_peak_lev']}", stijl.FMT_MULT_2),
 			("x_lev", f"={ZIJDE_LBO}C{rl['x_lev']}", stijl.FMT_MULT_2),
 			("x_min_dscr", f"={ZIJDE_LBO}C{rl['x_min_dscr']}", stijl.FMT_MULT_2),
+			("dc_multiple", f"={ZIJDE_LBO}C{rl['dc_multiple']}", stijl.FMT_MULT_2),
+			("atp_multiple", f"={ZIJDE_LBO}C{rl['atp_multiple']}", stijl.FMT_MULT_2),
+			("atp_headroom", f"={ZIJDE_LBO}C{rl['atp_headroom']}", stijl.FMT_PCT),
 		]
 		for sleutel, formule, fmt in links:
 			self._label(ws, nr, labels.ROW_LABELS[sleutel])
