@@ -1,0 +1,4 @@
+# Line endings: LF in git, native on checkout (CRLF on Windows)
+* text=auto
+*.xlsx binary
+*.pdf binary

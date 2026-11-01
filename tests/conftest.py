@@ -1,5 +1,7 @@
 """Shared test data: a realistic row built from a synthetic filing, so the tests need no private CSV."""
 import sys
+from dataclasses import replace
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -19,9 +21,11 @@ TEKSTVELDEN = {
 }
 
 
-def neerlegging(jaar, omzet, aankopen, personeel, overige=200_000.0, afschrijving=100_000.0, cash=900_000.0):
+def neerlegging(
+	jaar, omzet, aankopen, personeel, overige=200_000.0, afschrijving=100_000.0, cash=900_000.0, begin=None, einde=None,
+	referentie=None,
+):
 	"""A consistent full-schema filing: every total reconciles."""
-	from datetime import date
 
 	ebit = omzet - aankopen - personeel - overige - afschrijving
 	vaste_activa = 500_000.0
@@ -46,15 +50,40 @@ def neerlegging(jaar, omzet, aankopen, personeel, overige=200_000.0, afschrijvin
 		bestand=f"Test_JR{jaar}.csv",
 		ondernemingsnummer="0123456789",
 		naam="Testco",
-		begin=date(jaar, 1, 1),
-		einde=date(jaar, 12, 31),
-		referentie=str(jaar),
+		begin=begin or date(jaar, 1, 1),
+		einde=einde or date(jaar, 12, 31),
+		referentie=referentie or str(jaar),
 		valuta="EUR",
 		vereffening=False,
 		correctie=False,
 		codes=codes,
 		model="m02-f",
 	)
+
+
+# Codes die een verkort (VKT) of micro (MIC) schema niet publiceert: de omzet en de aankopen
+# zitten verborgen in de brutomarge (9900).
+NIET_IN_VERKORT = ("70", "70/76A", "60", "61", "60/66A")
+
+
+def verkort(volledig, model="m81-f"):
+	"""Dezelfde neerlegging in een verkort schema: brutomarge = omzet - aankopen, de rest blijft gelijk.
+
+	Een onbekende modelcode met 9900 geeft schema 'VKT/MIC'; 'm87' is het micro-schema (MIC).
+	"""
+	codes = {code: bedrag for code, bedrag in volledig.codes.items() if code not in NIET_IN_VERKORT}
+	codes["9900"] = volledig.codes["70"] - volledig.codes["60"] - volledig.codes["61"]
+	return replace(volledig, codes=codes, model=model)
+
+
+@pytest.fixture
+def filings_vkt(filings):
+	return [verkort(jaar) for jaar in filings]
+
+
+@pytest.fixture
+def filings_mic(filings):
+	return [verkort(jaar, model="m87-f") for jaar in filings]
 
 
 @pytest.fixture

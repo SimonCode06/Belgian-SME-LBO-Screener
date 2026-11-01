@@ -6,3 +6,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 ~$*.xlsx
+.venv/
+tests/baseline_local/
+.coverage
+htmlcov/

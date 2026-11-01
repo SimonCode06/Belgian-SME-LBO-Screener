@@ -1,0 +1,25 @@
+# Draait bij elke push en pull request alle tests op een schone Ubuntu-machine.
+# De Excel-recalculatietest heeft echte Excel nodig en wordt hier automatisch overgeslagen,
+# net als de regressietest op echte data (tests/baseline_local staat niet in git).
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Afhankelijkheden installeren
+        run: pip install -r requirements.txt
+      - name: Tests
+        run: pytest --cov=src --cov-report=term

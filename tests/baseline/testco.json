@@ -1,0 +1,48 @@
+{
+  "Aantal_Red_Flags": 1,
+  "Adjusted_Net_Debt": -548666.6666666666,
+  "Check_Data": "OK",
+  "Data_Volledigheid": "Complete",
+  "Genormaliseerde_EBITDA": 1600000.0,
+  "Indicatieve_EV": 8000000.0,
+  "Indicatieve_Equity_Value": 8548666.666666666,
+  "Instap_Multiple": 5.0,
+  "LBO_Balanscheck": "OK",
+  "LBO_EBITDA_Jaar5": 1881816.167401856,
+  "LBO_Eind_Net_Debt_to_EBITDA": -0.14,
+  "LBO_Instap_EV": 8000000.0,
+  "LBO_Laagste_Cash": 389432.6558382256,
+  "LBO_RCF_Piek": 0.0,
+  "LBO_Senior_Schuld": 4000000.0,
+  "LBO_Sponsor_Equity_Instap": 3520000.0,
+  "LBO_Status": "POSSIBLE CANDIDATE (See Red Flags)",
+  "Minimum_Operationele_Cash": 351333.3333333334,
+  "Net_Debt": -900000.0,
+  "Scenarios": {
+    "base": {
+      "Indicatieve_IRR_Pct": 22.4,
+      "Indicatieve_MoIC": 2.75,
+      "LBO_Convenanten": "OK",
+      "LBO_Hoogste_Leverage": 2.3,
+      "LBO_Laagste_DSCR": 1.3,
+      "LBO_Laagste_Rentedekking": 4.98
+    },
+    "downside": {
+      "Indicatieve_IRR_Pct": 11.8,
+      "Indicatieve_MoIC": 1.75,
+      "LBO_Convenanten": "BREACHED: Y1 DSCR 1.12x",
+      "LBO_Hoogste_Leverage": 2.8,
+      "LBO_Laagste_DSCR": 1.12,
+      "LBO_Laagste_Rentedekking": 4.37
+    },
+    "upside": {
+      "Indicatieve_IRR_Pct": 30.9,
+      "Indicatieve_MoIC": 3.85,
+      "LBO_Convenanten": "OK",
+      "LBO_Hoogste_Leverage": 1.9,
+      "LBO_Laagste_DSCR": 1.48,
+      "LBO_Laagste_Rentedekking": 5.61
+    }
+  },
+  "Senior_Multiple": 2.5
+}
