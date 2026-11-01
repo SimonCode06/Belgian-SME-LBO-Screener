@@ -76,10 +76,9 @@ def test_screening_drivers_are_labelled_rule_based(cijfers, filings):
 	assert "standard stress" in rij["LBO_Assumpties"]["screening_stress"]["overige_kosten_pct"]["rationale"]
 
 
-def test_the_assessment_does_not_use_the_screening_case_yet(cijfers, filings, monkeypatch):
-	"""Phase 1 only shows the screening case. The status still follows the analyst case."""
-	voor = bouw_dataframe([ai_rij(cijfers, filings)]).iloc[0]["LBO_Status"]
+def test_the_assessment_follows_the_screening_case(cijfers, filings, monkeypatch):
+	"""Since phase 5 the label comes from the screening case: a harsh standard stress removes the debt capacity."""
 	monkeypatch.setattr(config, "LBO_STRESS_EBITDA_HAIRCUT", [0.9] * 5)
 	na = bouw_dataframe([ai_rij(cijfers, filings)]).iloc[0]
-	assert na["LBO_Status"] == voor
+	assert na["LBO_Status"] == labels.STATUS_NO_GO_CAPACITY
 	assert na["LBO_Stress_Convenanten"].startswith(labels.COVENANTS_BREACHED)

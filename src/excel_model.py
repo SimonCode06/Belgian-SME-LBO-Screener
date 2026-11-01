@@ -1381,6 +1381,20 @@ class Bouwer:
 		self._zet(ws, nr, 3, "=Scenario", "@")
 		nr += 1
 
+		score = rij.get("Score")
+		for label, waarde, fmt in (
+			(labels.COLUMN_LABELS["Score"], None if score is None or pd.isna(score) else round(float(score), 1), "0.0"),
+			(labels.COLUMN_LABELS["Robuustheid_Pct"], (rij.get("Robuustheid_Pct") or 0) / 100, stijl.FMT_PCT),
+			(labels.COLUMN_LABELS["Dealtype"], f"{rij.get('Dealtype', '-')}: {rij.get('Dealtype_Toelichting', '')}", "@"),
+			(labels.COLUMN_LABELS["Analyst_Case"], rij.get("Analyst_Case", "-"), "@"),
+		):
+			self._label(ws, nr, label, vet=label == labels.COLUMN_LABELS["Score"])
+			cel = ws.cell(row=nr, column=3, value=waarde)
+			cel.font = stijl.lettertype(vet=label == labels.COLUMN_LABELS["Score"])
+			cel.number_format = fmt
+			cel.alignment = Alignment(horizontal="left")
+			nr += 1
+
 		status_snapshot = rij.get("LBO_Snapshot_Status", "-")
 		for label, waarde in (
 			(labels.SNAPSHOT_LABEL, rij.get("LBO_Snapshot_Naam", "-")),
@@ -1423,6 +1437,18 @@ class Bouwer:
 		for sleutel, formule, fmt in links:
 			self._label(ws, nr, labels.ROW_LABELS[sleutel])
 			self._zet(ws, nr, 3, formule, fmt)
+			nr += 1
+		nr += 1
+
+		self._sectie(ws, nr, labels.SECTION_SCORECARD)
+		for kolom, tekst in ((3, labels.SCORE_HEADER_SCORE), (4, labels.SCORE_HEADER_WEIGHT), (5, labels.SCORE_HEADER_REASON)):
+			ws.cell(row=nr, column=kolom, value=tekst)
+		nr += 1
+		for component in rij.get("Score_Componenten") or []:
+			self._label(ws, nr, component["label"])
+			self._zet(ws, nr, 3, round(component["score"], 1), "0", soort="invoer")
+			self._zet(ws, nr, 4, component["gewicht"], stijl.FMT_PCT, soort="invoer")
+			ws.cell(row=nr, column=5, value=component["reden"]).font = stijl.lettertype(grootte=8)
 			nr += 1
 		nr += 1
 

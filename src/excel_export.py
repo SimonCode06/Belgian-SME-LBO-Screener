@@ -49,6 +49,7 @@ OVERZICHT_KOLOMMEN = [
 	("LBO_Status", labels.GROUP_IDENTIFICATION, 36),
 	("Score", labels.GROUP_IDENTIFICATION, 9),
 	("Robuustheid_Pct", labels.GROUP_IDENTIFICATION, 10),
+	("Analyst_Case", labels.GROUP_IDENTIFICATION, 30),
 	("Data_Volledigheid", labels.GROUP_IDENTIFICATION, 34),
 	("Dealtype", labels.GROUP_IDENTIFICATION, 12),
 	("Eigendom", labels.GROUP_IDENTIFICATION, 34),
@@ -106,6 +107,7 @@ TEKST_KOLOMMEN = {
 	"Eigendom",
 	"Dealtype_Toelichting",
 	"Score_Toelichting",
+	"Analyst_Case",
 	"Kwalitatief_LBO_Oordeel",
 	"AI_Business_Model",
 }

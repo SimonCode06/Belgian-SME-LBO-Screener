@@ -21,7 +21,7 @@ def test_every_overview_column_has_an_english_label(cijfers):
 
 
 def test_baseline_gets_a_known_status(cijfers):
-	assert status_van(cijfers)["LBO_Status"].startswith((labels.STATUS_STRONG, labels.STATUS_POSSIBLE))
+	assert status_van(cijfers)["LBO_Status"].startswith((labels.STATUS_STRONG, labels.STATUS_POSSIBLE, labels.STATUS_WEAK))
 
 
 def test_data_mismatch_gives_review(cijfers):
@@ -58,9 +58,9 @@ def test_liquidation_signal_reaches_the_heavy_flags(cijfers):
 
 def test_every_status_has_a_colour():
 	for status in (
-		labels.STATUS_STRONG, labels.STATUS_POSSIBLE_FLAGS, labels.STATUS_POSSIBLE_CASHFLOW, labels.STATUS_REVIEW_DATA,
-		labels.STATUS_REVIEW_MODEL, labels.STATUS_NO_GO_EBITDA, labels.STATUS_NO_GO_DEBT, labels.STATUS_INSUFFICIENT,
-		labels.YES, labels.NO,
+		labels.STATUS_STRONG, labels.STATUS_POSSIBLE, labels.STATUS_WEAK, labels.STATUS_REVIEW_DATA,
+		labels.STATUS_REVIEW_MODEL, labels.STATUS_NO_GO_EBITDA, labels.STATUS_NO_GO_SIZE, labels.STATUS_NO_GO_CAPACITY,
+		labels.STATUS_NO_GO_EQUITY, labels.STATUS_INSUFFICIENT, labels.YES, labels.NO,
 	):
 		assert any(status.startswith(sleutel) for sleutel in labels.STATUS_COLOURS)
 

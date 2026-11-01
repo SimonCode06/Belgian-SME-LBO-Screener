@@ -45,6 +45,62 @@ def _dealtype(eigendom):
     return soort, tekst
 
 
+def _met_reden(status, redenen):
+    return labels.STATUS_WITH_REASON.format(status=status, reason="; ".join(redenen)) if redenen else status
+
+
+def _zwakste_tekst(rij):
+    return labels.REASON_WEAKEST.format(
+        components=", ".join(f"{c['label']} {c['score']:.0f}" for c in scorecard.zwakste(rij["Score_Componenten"]))
+    )
+
+
+def bepaal_status(rij):
+    """The label, in this order. Only the filing and the screening case decide: never the AI case."""
+    if rij["Check_Data"] != labels.CHECK_OK:
+        return labels.STATUS_REVIEW_DATA
+    if rij["LBO_Balanscheck"] == labels.CHECK_ERROR:
+        return labels.STATUS_REVIEW_MODEL
+    if rij["Data_Volledigheid"].startswith(labels.DATA_INSUFFICIENT) or rij["Driver_Aantal_Jaren"] < config.LBO_MIN_JAREN:
+        return labels.STATUS_INSUFFICIENT
+    if not rij["Genormaliseerde_EBITDA"] > 0:
+        return labels.STATUS_NO_GO_EBITDA
+    if rij["Genormaliseerde_EBITDA"] < config.LBO_MIN_EBITDA:
+        return labels.STATUS_NO_GO_SIZE
+    if rij["Debt_Capacity_Status"] == labels.CAPACITY_NA:
+        return labels.STATUS_INSUFFICIENT
+    if not rij["Debt_Capacity_Multiple"] >= config.LBO_MIN_DEBT_CAPACITY:
+        return labels.STATUS_NO_GO_CAPACITY
+    if not rij["ATP_Max_Equity_Price"] > 0:
+        return labels.STATUS_NO_GO_EQUITY
+
+    score, robuust, hoog = rij["Score"], rij["Robuustheid_Pct"], rij["Aantal_Hoge_Vlaggen"]
+    primary = rij["Dealtype"] == labels.DEAL_PRIMARY
+    if score >= config.SCORE_STERK and robuust >= config.ROBUUST_STERK_PCT and not hoog and primary:
+        return labels.STATUS_STRONG
+    # What keeps the company from STRONG, then the two weakest components
+    redenen = []
+    if not primary:
+        redenen.append(labels.REASON_DEAL_TYPE.format(deal=rij["Dealtype"]))
+    if hoog:
+        redenen.append(labels.REASON_HIGH_FLAGS.format(count=hoog))
+    if score >= config.SCORE_STERK and robuust < config.ROBUUST_STERK_PCT:
+        redenen.append(labels.REASON_ROBUSTNESS.format(pct=robuust))
+    redenen.append(_zwakste_tekst(rij))
+    if score >= config.SCORE_MOGELIJK:
+        return _met_reden(labels.STATUS_POSSIBLE, [labels.REASON_SCORE.format(score=score), *redenen])
+    return _met_reden(labels.STATUS_WEAK, [labels.REASON_SCORE.format(score=score), *redenen])
+
+
+def _analyst_case(rij):
+    """The AI case next to the label, as information: 'Analyst case (Gemini AI proposal): covenants OK, IRR 27.0%'."""
+    convenanten = str(rij["LBO_Convenanten"]).split(":")[0]
+    irr = rij["Indicatieve_IRR_Pct"]
+    return labels.ANALYST_CASE.format(
+        source=rij["LBO_Assumptie_Bron"], covenants=convenanten, irr="-" if pd.isna(irr) else f"{irr:.1f}%"
+    )
+
+
 def bouw_dataframe(resultaten):
     df = pd.DataFrame(resultaten)
 
@@ -329,36 +385,8 @@ def bouw_dataframe(resultaten):
     score = pd.DataFrame([scorecard.analyseer(r) for _, r in df.iterrows()], index=df.index)
     df = pd.concat([df, score], axis=1)
 
-    def bepaal_status(rij):
-        if rij["Check_Data"] != labels.CHECK_OK:
-            return labels.STATUS_REVIEW_DATA
-        if rij["LBO_Balanscheck"] == labels.CHECK_ERROR:
-            return labels.STATUS_REVIEW_MODEL
-        if rij["Data_Volledigheid"].startswith(labels.DATA_INSUFFICIENT):
-            return labels.STATUS_INSUFFICIENT
-        if rij["Genormaliseerde_EBITDA"] <= 0:
-            return labels.STATUS_NO_GO_EBITDA
-        if rij["Genormaliseerde_EBITDA"] < config.LBO_MIN_EBITDA:
-            return labels.STATUS_NO_GO_SIZE
-        if rij["LBO_Convenanten"].startswith(labels.NOT_APPLICABLE):
-            return labels.STATUS_INSUFFICIENT
-        if rij["Indicatieve_Equity_Value"] <= 0:
-            return labels.STATUS_NO_GO_EQUITY.format(multiple=rij["Instap_Multiple"])
-        if rij["LBO_Convenanten"] != labels.COVENANTS_OK or rij["LBO_Laagste_Cash"] < 0:
-            return labels.STATUS_NO_GO_DEBT
-        if rij["Indicatieve_IRR_Pct"] < 0:
-            return labels.STATUS_NO_GO_RETURN
-        if rij["Aantal_Hoge_Vlaggen"]:
-            return labels.STATUS_POSSIBLE_FLAGS
-        if (
-            rij["Data_Volledigheid"] == labels.DATA_COMPLETE
-            and rij["LBO_Eind_Net_Debt_to_EBITDA"] < config.LBO_TARGET_END_LEVERAGE
-            and rij["Indicatieve_IRR_Pct"] >= config.LBO_MIN_IRR_PCT
-        ):
-            return labels.STATUS_STRONG
-        return labels.STATUS_POSSIBLE_CASHFLOW
-
     df["LBO_Status"] = df.apply(bepaal_status, axis=1)
+    df["Analyst_Case"] = df.apply(_analyst_case, axis=1)
 
     volgorde = [
         "Bedrijfsnaam",
@@ -370,6 +398,7 @@ def bouw_dataframe(resultaten):
         "Boekjaar_Maanden_Vorig_Jaar",
         "Schema_Type",
         "LBO_Status",
+        "Analyst_Case",
         "Data_Volledigheid",
         "Omzet_Basis",
         "Omzet_of_Brutomarge_Vorig_Jaar",

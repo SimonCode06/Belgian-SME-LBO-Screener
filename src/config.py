@@ -70,6 +70,12 @@ SCORE_DATA_GEDEELTELIJK = 40            # datakwaliteit bij 'Partial'
 SCORE_DATA_VOLLEDIG = 80                # 'Complete' zonder geverifieerde citaten; + tot 20 voor geverifieerde citaten
 SCORE_DATA_GEEN_CITATEN = 90            # 'Complete' zonder AI-tekst om te controleren
 
+# Het oordeel (calculations.bepaal_status). De AI-case bepaalt het label nooit.
+LBO_MIN_DEBT_CAPACITY = 1.0      # Minder schuldcapaciteit (x EBITDA, Screening Stress): NO-GO
+SCORE_STERK = 70                 # STRONG: score vanaf deze waarde, robuustheid vanaf ROBUUST_STERK_PCT,
+ROBUUST_STERK_PCT = 60           # geen hoge red flag en een primary deal (geen carve-out of secondary)
+SCORE_MOGELIJK = 50              # POSSIBLE vanaf deze score; daaronder WEAK
+
 # Robuustheid: 18 doorrekeningen op de screening case. Slaagt als Screening Stress de covenants haalt en
 # Screening Base de doel-IRR. Forecast-EBITDA -10% / 0 / +10% bij een prijs en schuld op de gerapporteerde
 # EBITDA (quality-of-earnings-risico), instapmultiple -0,5x / 0 /
@@ -384,8 +390,10 @@ Fields:
   one assumption from the input; gekoppeld_aan names that red flag or assumption.
 
 Instructions:
-- LBO_Status is the conclusion of the model. Explain it: do not contradict it and do
-  not replace it with a conclusion of your own.
+- LBO_Status is the conclusion of the model. It follows from a scorecard on the
+  rule-based screening case (Score_Toelichting), the debt capacity under the standard
+  stress, the robustness grid and the deal type; the AI case never decides it. Explain
+  it: do not contradict it and do not replace it with a conclusion of your own.
 - Explain the result from the data: cash flow stability, multi-year trend, covenants,
   leverage, use of the RCF and returns. The screening case (rule-based, with a standard
   stress) and the AI case may differ: name the gap when it matters.
@@ -433,6 +441,14 @@ OORDEEL_VELDEN = [
 	"Normalisatie_Voorstellen",
 	"Red_Flags",
 	"Eigendom",
+	"Dealtype",
+	"Score",
+	"Score_Toelichting",
+	"Robuustheid_Pct",
+	"Debt_Capacity_Multiple",
+	"Debt_Capacity_Bindend",
+	"ATP_Max_Entry_Multiple",
+	"ATP_Headroom_Pct",
 	"LBO_Screening_IRR_Pct",
 	"LBO_Stress_IRR_Pct",
 	"LBO_Stress_Convenanten",

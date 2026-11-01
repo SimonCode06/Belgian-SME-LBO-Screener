@@ -10,19 +10,24 @@ cannot silently break a status check.
 # ============================================================================
 STATUS_STRONG = "STRONG LBO CANDIDATE"
 STATUS_POSSIBLE = "POSSIBLE CANDIDATE"
+STATUS_WEAK = "WEAK CANDIDATE"
 STATUS_NO_GO = "NO-GO"
 STATUS_REVIEW = "REVIEW"
 STATUS_INSUFFICIENT = "INSUFFICIENT DATA"
 
-STATUS_POSSIBLE_FLAGS = f"{STATUS_POSSIBLE} (See Red Flags)"
-STATUS_POSSIBLE_CASHFLOW = f"{STATUS_POSSIBLE} (Check Cash Flow)"
 STATUS_REVIEW_DATA = f"{STATUS_REVIEW} (Data Does Not Reconcile)"
 STATUS_REVIEW_MODEL = f"{STATUS_REVIEW} (Model Does Not Reconcile)"
 STATUS_NO_GO_EBITDA = f"{STATUS_NO_GO} (Negative/No EBITDA)"
 STATUS_NO_GO_SIZE = f"{STATUS_NO_GO} (Too Small for an LBO)"
-STATUS_NO_GO_EQUITY = STATUS_NO_GO + " (No Equity for Seller at {multiple}x)"
-STATUS_NO_GO_DEBT = f"{STATUS_NO_GO} (New Debt Not Serviceable)"
-STATUS_NO_GO_RETURN = f"{STATUS_NO_GO} (Negative Return)"
+STATUS_NO_GO_CAPACITY = f"{STATUS_NO_GO} (No Debt Capacity)"
+STATUS_NO_GO_EQUITY = f"{STATUS_NO_GO} (No Equity for the Seller at the Target IRR)"
+STATUS_WITH_REASON = "{status} ({reason})"
+REASON_WEAKEST = "weakest: {components}"
+REASON_DEAL_TYPE = "{deal} deal"
+REASON_HIGH_FLAGS = "{count} high red flag(s)"
+REASON_ROBUSTNESS = "robustness {pct:.0f}%"
+REASON_SCORE = "score {score:.0f}"
+ANALYST_CASE = "Analyst case ({source}): covenants {covenants}, IRR {irr}"
 
 YES = "YES"
 NO = "NO"
@@ -58,6 +63,7 @@ API_KEY_REFUSED = "API key refused"
 STATUS_COLOURS = {
 	STATUS_STRONG: ("C6EFCE", "006100"),
 	STATUS_POSSIBLE: ("FFEB9C", "9C6500"),
+	STATUS_WEAK: ("FCE4D6", "9C3B00"),
 	STATUS_NO_GO: ("FFC7CE", "9C0006"),
 	STATUS_REVIEW: ("FFC7CE", "9C0006"),
 	STATUS_INSUFFICIENT: ("FFEB9C", "9C6500"),
@@ -372,6 +378,10 @@ SECTION_SCHEDULES = "FIXED ASSETS, GOODWILL AND FINANCING FEES"
 SECTION_CHECKS = "MODEL INTEGRITY CHECKS"
 SECTION_INPUTS = "TRANSACTION INPUTS"
 SECTION_BRIDGE = "EV-TO-EQUITY BRIDGE"
+SECTION_SCORECARD = "SCREENING SCORECARD (FILING AND SCREENING CASE; DECIDES THE ASSESSMENT)"
+SCORE_HEADER_SCORE = "Score"
+SCORE_HEADER_WEIGHT = "Weight"
+SCORE_HEADER_REASON = "Reason"
 SECTION_STRUCTURE = "DEBT CAPACITY & ABILITY-TO-PAY"
 STRUCTURE_NOTE = "Computed in Python on the screening case (bisection); the last line is live"
 STRUCTURE_SELECT_STRESS = "Select 'Screening Stress' in the scenario selector"
@@ -398,7 +408,7 @@ ROW_USED = "{driver}: Used"
 
 STATUS_LABEL = "LBO Assessment"
 OVERRIDES_ACTIVE = "Overrides active"
-OVERRIDES_NOTE = "The assessment reflects the AI case and does not follow overrides."
+OVERRIDES_NOTE = "The assessment follows the screening case (scorecard) and does not follow overrides."
 SCENARIO_NOTE = "Python results on the proposed assumptions: these do not follow overrides."
 
 # Row labels of the workbook, by internal row key
@@ -816,6 +826,7 @@ COLUMN_LABELS = {
 	"Aantal_Hoge_Vlaggen": "Red Flags: High (Counted)",
 	"Dealtype": "Deal Type",
 	"Score": "Screening Score (0-100)",
+	"Analyst_Case": "Analyst Case (AI, Information)",
 	"Score_Toelichting": "Score: Components and Reasons",
 	"Robuustheid_Pct": "Robustness (Share of 18 Runs Passing)",
 	"Hist_Cash_Conversion_Pct": "Cash Conversion (Historical Average)",
