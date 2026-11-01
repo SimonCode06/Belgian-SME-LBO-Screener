@@ -277,3 +277,31 @@ def test_calibration_file_ranks_by_score(mappen):
 	assert list(tabel["Score"]) == sorted(tabel["Score"], reverse=True)
 	for kolom in ("Status", "Debt capacity x", "Max entry x", "Debt Capacity", "Debt Capacity: reason", "Data Quality"):
 		assert kolom in tabel.columns, kolom
+
+
+# --- Linking the PDF ----------------------------------------------------------------------
+
+
+def test_pdf_per_fiscal_year_picks_the_latest(tmp_path, filings):
+	paden = [tmp_path / naam for naam in ("Test_JR2023.pdf", "Test_JR2024.pdf", "Andere.pdf")]
+	index = app.pdf_index(paden)
+	assert app.zoek_pdf(filings, index).name == "Test_JR2024.pdf"
+
+
+def test_pdf_name_with_spaces_and_one_pdf_without_year(tmp_path, filings):
+	from dataclasses import replace
+
+	bedrijf = [replace(jaar, naam="Aikido Security", bestand=f"AikidoSecurity_JR{jaar.boekjaar}.csv") for jaar in filings]
+	index = app.pdf_index([tmp_path / "Aikido Security _ JR2023.pdf", tmp_path / "Aikido Security _ JR2022.pdf"])
+	assert app.zoek_pdf(bedrijf, index).name == "Aikido Security _ JR2023.pdf"  # no 2024 PDF: the most recent one
+	assert app.zoek_pdf(filings, app.pdf_index([tmp_path / "Testco.pdf"])).name == "Testco.pdf"
+	assert app.splits_bestandsnaam("Flanders Food Productions_ JR2025") == ("Flanders Food Productions", "2025")
+
+
+def test_pdf_year_can_follow_the_csv_file_name(tmp_path, filings):
+	"""Broken fiscal year: 'JR2023' in the file names is the filing that ends in 2024."""
+	from dataclasses import replace
+
+	bedrijf = filings[:-1] + [replace(filings[-1], bestand="Test_JR2023.csv")]
+	index = app.pdf_index([tmp_path / "Test_JR2023.pdf", tmp_path / "Test_JR2022.pdf"])
+	assert app.zoek_pdf(bedrijf, index).name == "Test_JR2023.pdf"

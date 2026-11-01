@@ -43,14 +43,50 @@ def naam_sleutel(naam):
 	return re.sub(r"[\W_]", "", naam).casefold()
 
 
+JAAR_IN_NAAM = re.compile(r"[\s_-]*JR[\s_-]*(\d{4})\s*$", re.IGNORECASE)
+
+
+def splits_bestandsnaam(stem):
+	"""'Cloudar_JR2025' -> ('Cloudar', '2025'); 'Aikido Security _ JR2023' -> ('Aikido Security', '2023'); 'Cloudar' -> ('Cloudar', None)."""
+	treffer = JAAR_IN_NAAM.search(stem)
+	if not treffer:
+		return stem, None
+	return stem[: treffer.start()], treffer.group(1)
+
+
+def pdf_index(bestanden):
+	"""{name key: [(year or None, path)]}: one PDF per company, or one per fiscal year."""
+	index = {}
+	for pad in bestanden:
+		if pad.suffix.lower() == ".pdf":
+			naam, jaar = splits_bestandsnaam(pad.stem)
+			index.setdefault(naam_sleutel(naam), []).append((jaar, pad))
+	return index
+
+
 def zoek_pdf(neerleggingen, pdf_per_naam):
-	"""Zoekt de PDF van een bedrijf op bedrijfsnaam of op het begin van de CSV-bestandsnaam."""
+	"""De PDF van het recentste boekjaar, gezocht op bedrijfsnaam of op het begin van de CSV-bestandsnaam.
+
+	Volgorde: een PDF met het jaar van de recentste neerlegging (boekjaar of jaartal in de CSV-naam), dan een PDF
+	zonder jaar, dan de recentste.
+	"""
 	namen = {neerlegging.naam for neerlegging in neerleggingen}
-	namen |= {re.split(r"_JR\d{4}", neerlegging.bestand)[0] for neerlegging in neerleggingen}
+	namen |= {splits_bestandsnaam(neerlegging.bestand.rsplit(".", 1)[0])[0] for neerlegging in neerleggingen}
+	# Het jaar in de naam is het boekjaar, of het jaartal dat je zelf in de CSV-naam gebruikt (bij een gebroken
+	# boekjaar kan 'JR2025' de neerlegging met einddatum 2026 zijn)
+	jaren = [neerleggingen[-1].boekjaar, splits_bestandsnaam(neerleggingen[-1].bestand.rsplit(".", 1)[0])[1]]
 	for naam in namen:
-		pdf = pdf_per_naam.get(naam_sleutel(naam))
-		if pdf is not None:
-			return pdf
+		kandidaten = pdf_per_naam.get(naam_sleutel(naam))
+		if not kandidaten:
+			continue
+		for gezocht in jaren:
+			for jaar, pad in kandidaten:
+				if gezocht and jaar == gezocht:
+					return pad
+		zonder_jaar = [pad for jaar, pad in kandidaten if jaar is None]
+		if zonder_jaar:
+			return zonder_jaar[0]
+		return max(kandidaten, key=lambda kandidaat: kandidaat[0])[1]
 	return None
 
 
@@ -318,7 +354,7 @@ def main(argv=None):
 
 	bestanden = sorted(config.INPUT_FOLDER.iterdir())
 	csv_bestanden = [p for p in bestanden if p.suffix.lower() == ".csv"]
-	pdf_per_naam = {naam_sleutel(p.stem): p for p in bestanden if p.suffix.lower() == ".pdf"}
+	pdf_per_naam = pdf_index(bestanden)
 	if not csv_bestanden:
 		print(f"Geen CSV-bestanden gevonden in '{config.INPUT_FOLDER}'. Plaats hier NBB-CSV's.")
 		return
@@ -411,7 +447,9 @@ def main(argv=None):
 			}
 		)
 
-	zonder_csv = [p.name for p in pdf_per_naam.values() if p not in gebruikte_pdfs]
+	# PDF's van een naam waarvoor geen enkel bedrijf gevonden is (oudere jaren van een bedrijf zijn geen fout)
+	gebruikte_namen = {sleutel for sleutel, kandidaten in pdf_per_naam.items() if any(p in gebruikte_pdfs for _, p in kandidaten)}
+	zonder_csv = [p.name for sleutel, kandidaten in pdf_per_naam.items() if sleutel not in gebruikte_namen for _, p in kandidaten]
 	if zonder_csv:
 		print(f"\nOvergeslagen, geen CSV gevonden: {', '.join(zonder_csv)}")
 

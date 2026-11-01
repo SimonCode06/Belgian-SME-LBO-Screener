@@ -165,6 +165,10 @@ SIGNAL_CORRECTED = "Fiscal year {year} is a corrected filing"
 SIGNAL_SOCIAL_DEBT = (
 	"Fiscal year {year}: EUR {value:,.0f} of social security debt (454/9) is not in the notes (9076, 9077)"
 )
+SIGNAL_TAX_SPLIT = (
+	"Fiscal year {year}: abridged schema without the split of tax and social debts (450, 9072, 9076): "
+	"all tax debts (450/3) treated as debt-like"
+)
 SIGNAL_NO_PRIOR_YEAR = "No consecutive CSV for the fiscal year before {year}: no trend calculated"
 
 ERROR_CODE_MISSING = "code {code} missing"

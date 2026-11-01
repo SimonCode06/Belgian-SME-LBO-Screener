@@ -305,3 +305,25 @@ def test_meerjaren_verkort_schema(filings_vkt):
 	rijen = bouw_meerjaren(filings_vkt)
 	assert rijen[-1]["Omzet"] == 4_000_000.0
 	assert rijen[-1]["Model"]["Inkoop"] == 0.0
+
+
+# --- Abridged schema without the split of tax and social debts ---------------------------
+
+
+def test_abridged_schema_without_tax_split_uses_the_total(filings_vkt):
+	jaar = filings_vkt[-1]
+	codes = {code: bedrag for code, bedrag in jaar.codes.items() if code not in ("450", "9072", "9073", "9076", "9077")}
+	codes["450/3"] = 0.0
+	reeks = filings_vkt[:-1] + [replace(jaar, codes=codes)]
+	cijfers = bouw_cijfers(reeks)
+	assert cijfers["Belasting_en_Vervallen_RSZ_Schulden"] == 0.0
+	assert cijfers["Data_Volledigheid"] == labels.DATA_COMPLETE
+	assert labels.SIGNAL_TAX_SPLIT.format(year="2024") in cijfers["Cijfer_Flags"]
+
+
+def test_full_schema_without_tax_split_stays_unknown(filings):
+	jaar = filings[-1]
+	codes = {code: bedrag for code, bedrag in jaar.codes.items() if code not in ("450", "9072", "9073", "9076", "9077", "454/9", "45")}
+	reeks = filings[:-1] + [replace(jaar, codes=codes)]
+	cijfers = bouw_cijfers(reeks)
+	assert math.isnan(cijfers["Belasting_en_Vervallen_RSZ_Schulden"])

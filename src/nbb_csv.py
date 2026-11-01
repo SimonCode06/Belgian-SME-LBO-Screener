@@ -243,6 +243,8 @@ def _signalen(neerlegging):
 	if "9077" in neerlegging.codes and not neerlegging.sluit_aan("454/9", ("9076", "9077")):
 		verschil = neerlegging.bedrag("454/9") - neerlegging.bedrag("9076", "9077")
 		signalen.append(labels.SIGNAL_SOCIAL_DEBT.format(year=neerlegging.boekjaar, value=verschil))
+	if _belasting_benaderd(neerlegging):
+		signalen.append(labels.SIGNAL_TAX_SPLIT.format(year=neerlegging.boekjaar))
 	return signalen
 
 
@@ -313,6 +315,30 @@ def _normalisatie_toelichting(neerlegging):
 	if neerlegging.ontbrekend("66A", "76A"):
 		return labels.ADJUSTMENTS_UNAVAILABLE
 	return labels.ADJUSTMENTS_NOTE.format(expenses=neerlegging.bedrag("66A"), income=neerlegging.bedrag("76A"))
+
+
+BELASTING_CODES = ("450", "9072", "9076")
+
+
+def _belastingschulden(neerlegging):
+	"""Debt-like belasting- en vervallen RSZ-schulden: geraamde belastingen (450) + vervallen schulden (9072, 9076).
+
+	Een verkort of micro-schema publiceert die uitsplitsing niet. Dan telt het totaal van de belastingschulden
+	(450/3, of anders 45 min de sociale schulden) als debt-like: voorzichtig, want een deel is lopende btw.
+	"""
+	if not neerlegging.ontbrekend(*BELASTING_CODES):
+		return neerlegging.bedrag(*BELASTING_CODES)
+	if neerlegging.schema == "VOL":
+		return NIET_BESCHIKBAAR
+	if neerlegging.is_bekend("450/3"):
+		return neerlegging.bedrag("450/3")
+	if neerlegging.is_bekend("45"):
+		return neerlegging.bedrag("45") - _of_nul(neerlegging.waarde("454/9"))
+	return NIET_BESCHIKBAAR
+
+
+def _belasting_benaderd(neerlegging):
+	return bool(neerlegging.ontbrekend(*BELASTING_CODES)) and not math.isnan(_belastingschulden(neerlegging))
 
 
 def _liquide_middelen(neerlegging):
@@ -386,7 +412,7 @@ def _doelratio(ratios):
 def _balansregels(neerlegging):
 	"""De balans in de lijnen van het model. Actief en passief sluiten op het balanstotaal."""
 	liquide = neerlegging.waarde(*LIQUIDE_CODES)
-	debt_like = neerlegging.waarde("16", "450", "9072", "9076", "178/9", "47/48")
+	debt_like = neerlegging.waarde("16", "178/9", "47/48") + _belastingschulden(neerlegging)
 	overige_activa = (
 		neerlegging.waarde("20/58") - _vaste_activa(neerlegging) - neerlegging.waarde("28", "3", "40") - liquide
 	)
@@ -497,6 +523,8 @@ def _data_volledigheid(huidig, vorig, omzet_code, aantal_jaren):
 		for codes in velden.values()
 		for code in codes
 	]
+	if _belasting_benaderd(huidig):  # verkort schema: benaderd uit het totaal (zie _belastingschulden)
+		kerncodes = [code for code in kerncodes if code not in BELASTING_CODES]
 	ontbrekend = huidig.ontbrekend(omzet_code, "66A", "76A", *LIQUIDE_CODES, *kerncodes)
 	if math.isnan(_capex(huidig)):
 		ontbrekend.append(labels.COMPLETENESS_CAPEX)
@@ -598,6 +626,7 @@ def bouw_cijfers(neerleggingen):
 		"Normalisatie_Toelichting": _normalisatie_toelichting(huidig),
 		**{veld: huidig.per_jaar(*codes) for veld, codes in RESULTAATVELDEN.items()},
 		**{veld: huidig.waarde(*codes) for veld, codes in BALANSVELDEN.items()},
+		"Belasting_en_Vervallen_RSZ_Schulden": _belastingschulden(huidig),
 		"Liquide_Middelen": _liquide_middelen(huidig),
 		"Eigen_Aandelen": huidig.bedrag("50"),
 		"Balanstotaal": huidig.waarde("20/58"),
