@@ -53,10 +53,10 @@ def bouw_pdf_part(client, pdf_pad):
 
 def bouw_prompt(cijfers):
 	"""De vaste instructies plus de cijfers uit de CSV als gegeven."""
+	# Alleen een vaste lijst: een nieuw berekend veld in de cijfers mag geen nieuwe (betaalde) analyse uitlokken
 	gegevens = {
-		sleutel: None if isinstance(waarde, float) and math.isnan(waarde) else waarde
-		for sleutel, waarde in cijfers.items()
-		if sleutel != "Bronbestand"  # een andere bestandsnaam mag geen nieuwe analyse uitlokken
+		sleutel: None if isinstance(cijfers.get(sleutel), float) and math.isnan(cijfers[sleutel]) else cijfers.get(sleutel)
+		for sleutel in config.TEKST_PROMPT_VELDEN
 	}
 	return (
 		f"{config.SYSTEEM_PROMPT}\n"

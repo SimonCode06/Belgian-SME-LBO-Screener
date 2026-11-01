@@ -659,6 +659,7 @@ COLUMN_LABELS = {
 	"NWC_Peg_Jaren": "NWC Peg: Year-Ends Used",
 	"NWC_Aanpassing": "NWC Adjustment (to Seller)",
 	"Ledger_EBITDA": "Approved EBITDA Adjustments (Ledger)",
+	"Driver_DSO_Excl_BTW": "DSO excl. VAT (KPI)",
 	"Open_Intercompany_Cash_Like": "Opening: Intercompany Cash-Like",
 	"Voorraden": "Inventory",
 	"Handelsvorderingen": "Trade Receivables",

@@ -160,6 +160,9 @@ def bouw_dataframe(resultaten):
         .round(2)
     )
 
+    # DSO as a KPI: receivables include 21% VAT, revenue does not (display only)
+    df["Driver_DSO_Excl_BTW"] = pd.to_numeric(df["Driver_DSO"]) / config.BTW_FACTOR
+
     # Fase 2: Equity Bridge & Trade Working Capital
     df["Totale_Financiele_Schuld"] = df["Financiele_Schulden_LT"] + df["Financiele_Schulden_KT"]
     df["Debt_Like_Items"] = (
@@ -493,6 +496,7 @@ def bouw_dataframe(resultaten):
         "Driver_DA_Pct_Vaste_Activa",
         "Driver_Capex_Pct",
         "Driver_DSO",
+        "Driver_DSO_Excl_BTW",
         "Driver_DIO",
         "Driver_DPO",
         "Driver_Dagen_Vooruitbetaling",

@@ -335,3 +335,12 @@ def test_cash_paying_vendor_loan_when_pik_is_off(cijfers, monkeypatch):
 	assert model["Jaren"][-1]["Vendor_Loan"] == pytest.approx(model["Jaren"][0]["Vendor_Loan"])
 	assert all(jaar["PIK_Rente"] == 0.0 for jaar in model["Jaren"][1:])
 	assert model["LBO_Balanscheck"] == labels.CHECK_OK
+
+
+# --- 3.8 Parameters -----------------------------------------------------------------------
+
+
+def test_dso_kpi_excludes_vat_and_does_not_change_the_forecast(cijfers):
+	rij = bouw_dataframe([cijfers]).iloc[0]
+	assert rij["Driver_DSO_Excl_BTW"] == pytest.approx(rij["Driver_DSO"] / 1.21)
+	assert rij["LBO_Assumpties"]["base"]["dso"]["waarden"][0] == pytest.approx(rij["Driver_DSO"])

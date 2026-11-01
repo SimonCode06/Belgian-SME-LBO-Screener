@@ -147,6 +147,9 @@ LBO_RENTEAFTREK_EBITDA_PCT = 0.30        # ...en 30% van de EBITDA
 
 # Forecast
 DAGEN_PER_JAAR = 365            # Basis van DSO, DIO, DPO en vooruitbetalingen
+# Handelsvorderingen bevatten btw, de omzet niet: de DSO uit de jaarrekening is daardoor te hoog.
+# Alleen voor de weergave van de KPI (DSO excl. btw); de forecast blijft op de balansdefinitie rekenen.
+BTW_FACTOR = 1.21
 LBO_HOLDING_PERIOD_YEARS = 5     # Investeringshorizon van het PE-fonds (5 jaar)
 LBO_MIN_JAREN = 3                # Minder boekjaren: drivers zijn zwak, dus geen sterke kandidaat
 LBO_MAX_JAREN = 5                # Meer boekjaren gebruikt het model niet
@@ -155,7 +158,7 @@ LBO_GROEI_MIN = -0.05            # De historische CAGR wordt begrensd tussen dit
 LBO_GROEI_MAX = 0.05             # ...en dit maximum: een piekjaar mag niet 5 jaar doorlopen
 LBO_KOSTEN_GLIDE_JAREN = 3       # In zoveel jaren lopen de kostenratio's van het laatste boekjaar naar hun doelniveau
 LBO_TARGET_END_LEVERAGE = 2.0    # Doeldrempel: schuld binnen 5 jaar onder 2,0x EBITDA
-LBO_MIN_IRR_PCT = 15.0           # Minimale IRR voor een sterke kandidaat
+LBO_MIN_IRR_PCT = 20.0           # Minimale IRR voor een sterke kandidaat (gangbare PE-hurdle)
 
 # Screening
 MAX_MARGE_DALING_PP = 2.0        # Red flag als EBITDA-marge meer dan 2,0 procentpunt daalt
@@ -289,6 +292,18 @@ CITAAT_MIN_LENGTE = 12          # Kortere citaten zijn te algemeen om iets te be
 CITAAT_MIN_TEKST_TEKENS = 200   # Minder tekst in de hele PDF: gescand, dus niet controleerbaar
 
 # De sleutels van het tekstantwoord staan in tekst_schema.TekstAntwoord (afgedwongen schema)
+
+# De cijfers die de tekstpass meekrijgt. Een vaste lijst: zo maakt een nieuw berekend veld de cache niet
+# ongeldig. Wijzig je deze lijst, dan komt er bij de volgende run een nieuwe tekstanalyse.
+TEKST_PROMPT_VELDEN = (
+	"Bedrijfsnaam", "Ondernemingsnummer", "Boekjaar", "Boekjaar_Begin", "Boekjaar_Einde", "Boekjaar_Maanden",
+	"Schema_Type", "Omzet_Basis", "Omzet_of_Brutomarge", "Omzet_of_Brutomarge_Vorig_Jaar", "Brutomarge",
+	"Bedrijfswinst_EBIT", "Bedrijfswinst_EBIT_Vorig_Jaar", "Afschrijvingen", "Voorzieningen_Mutatie",
+	"Personeelskosten", "Inkoop", "VTE", "Normalisatie_Bedrag", "Normalisatie_Toelichting",
+	"Financiele_Schulden_LT", "Financiele_Schulden_KT", "Liquide_Middelen", "Eigen_Vermogen", "Balanstotaal",
+	"Overgedragen_Resultaat", "Memo_Zekerheden_Derden", "Memo_Vorderingen_Bestuurders", "Memo_Vorderingen_Verbonden",
+	"Data_Volledigheid", "Check_Data", "Cijfer_Flags",
+)
 
 # Tweede pass: na de berekening licht Gemini de resultaten toe. Het oordeel staat al vast.
 OORDEEL_PROMPT = """

@@ -124,7 +124,7 @@ PCT_KOLOMMEN = {
 	"LBO_Forecast_Groei_Pct",
 	"LBO_EBITDA_Marge_Exit_Pct",
 }
-DAGEN_KOLOMMEN = {"Driver_DSO", "Driver_DIO", "Driver_DPO", "Driver_Dagen_Vooruitbetaling"}
+DAGEN_KOLOMMEN = {"Driver_DSO_Excl_BTW", "Driver_DSO", "Driver_DIO", "Driver_DPO", "Driver_Dagen_Vooruitbetaling"}
 GETAL_KOLOMMEN = {"NWC_Peg_Jaren", "Capex_Aantal_Jaren", "Driver_Aantal_Jaren", "VTE", "LBO_Duur_Jaren", "Boekjaar_Maanden", "Boekjaar_Maanden_Vorig_Jaar"}
 MULT_KOLOMMEN = {
 	"Instap_Multiple",

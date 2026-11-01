@@ -6,12 +6,15 @@ each PDF page and searches the quote with fuzzy matching (rapidfuzz), on the pag
 and the pages next to it. A quote that cannot be found lowers the confidence to 'low' and
 adds a soft flag. Nothing else changes: the check never edits a value.
 """
+import logging
 import re
 import unicodedata
 
 from rapidfuzz import fuzz
 
 from . import config, labels
+
+logging.getLogger("pypdf").setLevel(logging.ERROR)  # font warnings on NBB PDFs are noise for a text search
 
 GEVERIFIEERD = "verified"
 ANDERE_PAGINA = "verified (other page)"
