@@ -344,3 +344,28 @@ def test_dso_kpi_excludes_vat_and_does_not_change_the_forecast(cijfers):
 	rij = bouw_dataframe([cijfers]).iloc[0]
 	assert rij["Driver_DSO_Excl_BTW"] == pytest.approx(rij["Driver_DSO"] / 1.21)
 	assert rij["LBO_Assumpties"]["base"]["dso"]["waarden"][0] == pytest.approx(rij["Driver_DSO"])
+
+
+# --- 4.0 Structure as a parameter ---------------------------------------------------------
+
+
+def test_default_structure_gives_the_same_result(cijfers):
+	from src.lbo_model import bereken_lbo, standaard_structuur
+
+	rij = bouw_dataframe([cijfers]).iloc[0]
+	standaard = standaard_structuur(rij["Genormaliseerde_EBITDA"])
+	assert standaard.entry_multiple == rij["Instap_Multiple"] and standaard.senior_multiple == rij["Senior_Multiple"]
+	met = bereken_lbo(rij, "base", standaard)
+	assert met["LBO_IRR_Exact_Pct"] == rij["LBO_Scenarios"]["base"]["LBO_IRR_Exact_Pct"]
+
+
+def test_another_structure_still_reconciles(cijfers):
+	from src.lbo_model import Structuur, bereken_lbo
+
+	rij = bouw_dataframe([cijfers]).iloc[0]
+	model = bereken_lbo(rij, "base", Structuur(6.0, 5.0, 3.0, 0.0))
+	assert model["LBO_Instap_EV"] == pytest.approx(6.0 * rij["Genormaliseerde_EBITDA"])
+	assert model["LBO_Senior_Schuld"] == pytest.approx(3.0 * rij["Genormaliseerde_EBITDA"])
+	assert model["LBO_Vendor_Loan"] == 0.0
+	assert model["LBO_Exit_EV_Jaar5"] == pytest.approx(5.0 * model["LBO_EBITDA_Jaar5"])
+	assert model["LBO_Balanscheck"] == labels.CHECK_OK

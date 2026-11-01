@@ -28,6 +28,7 @@ Een RCF vangt tekorten op: een tekort op de minimum cash gaat eerst naar een tre
 overschot eerst naar de terugbetaling van de RCF, pas daarna naar de sweep en het dividend.
 """
 import math
+from dataclasses import dataclass
 from datetime import date, timedelta
 
 from . import assumpties, config, labels
@@ -72,6 +73,22 @@ def kies_multiples(ebitda):
 			deel = (ebitda - x0) / (x1 - x0)
 			return instap0 + deel * (instap1 - instap0), senior0 + deel * (senior1 - senior0)
 	return ankers[-1][1], ankers[-1][2]
+
+
+@dataclass(frozen=True)
+class Structuur:
+	"""De financieringsstructuur van één doorrekening. Zonder structuur gebruikt het model de standaard."""
+
+	entry_multiple: float
+	exit_multiple: float
+	senior_multiple: float
+	vendor_pct: float
+
+
+def standaard_structuur(ebitda):
+	"""Instap = exit (geen multiple expansion), senior volgens de grootte, vendor loan uit config."""
+	instap, senior = kies_multiples(ebitda)
+	return Structuur(instap, instap, senior, config.LBO_VENDOR_LOAN_PCT_EV)
 
 
 def net_debt(doel, financiele_schuld, cash, minimum_cash, debt_like=0.0):
@@ -302,8 +319,11 @@ def _integriteitstesten(jaren, bronnen, bestedingen, minimum_cash):
 	]
 
 
-def bereken_lbo(rij, scenario="base"):
-	"""Rekent de LBO door voor één bedrijf en één scenario. Geeft de samenvatting, 'Jaren' en 'Integriteit' terug."""
+def bereken_lbo(rij, scenario="base", structuur=None):
+	"""Rekent de LBO door voor één bedrijf en één scenario. Geeft de samenvatting, 'Jaren' en 'Integriteit' terug.
+
+	structuur: een andere financieringsstructuur (debt capacity, ability-to-pay); None = de standaard.
+	"""
 	if any(math.isnan(float(rij[veld])) for veld in VEREISTE_VELDEN):
 		return _geen_lbo(labels.not_available(labels.REASON_INSUFFICIENT_DATA))
 	ebitda_0 = float(rij["Genormaliseerde_EBITDA"])
@@ -322,13 +342,14 @@ def bereken_lbo(rij, scenario="base"):
 	kosten_6061 = rij["Driver_Kosten_6061_Pct"] / 100
 
 	# 1. Bronnen en bestedingen
-	instap_multiple, senior_multiple = kies_multiples(ebitda_0)
+	structuur = structuur or standaard_structuur(ebitda_0)
+	instap_multiple, senior_multiple = structuur.entry_multiple, structuur.senior_multiple
 	instap_ev = ebitda_0 * instap_multiple
 	transactiekosten = instap_ev * config.LBO_TRANSACTIEKOSTEN_PCT
 	financieringskosten = instap_ev * config.LBO_FINANCIERINGSKOSTEN_PCT
 	kosten = transactiekosten + financieringskosten
 	senior_0 = ebitda_0 * senior_multiple
-	vendor = instap_ev * config.LBO_VENDOR_LOAN_PCT_EV
+	vendor = instap_ev * structuur.vendor_pct
 	# De NWC-aanpassing verandert de prijs voor de verkoper, niet wat de sponsor inbrengt: het verschil
 	# blijft als cash in het bedrijf voor de normalisatie van het werkkapitaal in jaar 1
 	nwc_aanpassing = float(rij.get("NWC_Aanpassing", 0.0))
@@ -336,8 +357,10 @@ def bereken_lbo(rij, scenario="base"):
 	rcf_limiet = ebitda_0 * config.LBO_RCF_LIMIET_X_EBITDA
 	bronnen = senior_0 + vendor + sponsor_equity
 	nwc_aanpassing_0 = float(rij.get("NWC_Aanpassing", 0.0))
+	# De equity-prijs volgt de EV van deze structuur (bij de standaard: de indicatieve equity value)
+	equity_prijs = instap_ev - float(rij["Adjusted_Net_Debt"]) + nwc_aanpassing_0
 	bestedingen = (
-		float(rij["Indicatieve_Equity_Value"]) + float(rij["Adjusted_Net_Debt"]) + transactiekosten + financieringskosten
+		equity_prijs + float(rij["Adjusted_Net_Debt"]) + transactiekosten + financieringskosten
 		- nwc_aanpassing_0  # cash die in het bedrijf blijft voor de normalisatie van het werkkapitaal
 	)
 
@@ -642,7 +665,7 @@ def bereken_lbo(rij, scenario="base"):
 	# 4. Uitstap en rendement. De normale cash hoort bij de EV, zoals bij de instap.
 	forecast = jaren[1:]
 	exit_ebitda = forecast[-1]["EBITDA"] / forecast[-1]["Fractie"]
-	exit_ev = max(exit_ebitda, 0.0) * instap_multiple
+	exit_ev = max(exit_ebitda, 0.0) * structuur.exit_multiple
 	eind_net_debt = net_debt("waardering", senior + rcf + vendor, cash, minimum_cash)
 	exit_equity = exit_ev - eind_net_debt
 	eind_leverage = round(eind_net_debt / exit_ebitda, 2) if exit_ebitda > 0 else NIET_BESCHIKBAAR
