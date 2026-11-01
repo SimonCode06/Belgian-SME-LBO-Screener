@@ -280,6 +280,7 @@ SCORE_LABELS = {
 	"headroom": "Price Headroom",
 	"cashflow": "Cash Flow Quality",
 	"trend": "Trend",
+	"scale": "Scale & Margin",
 	"governance": "Governance & Risk",
 	"data": "Data Quality",
 }
@@ -288,6 +289,7 @@ SCORE_REASON_HEADROOM = "{pct:+.1f}%: max {multiple:.2f}x at the target IRR vs {
 SCORE_REASON_HEADROOM_CAP = "above the search range"
 SCORE_REASON_CASHFLOW = "cash conversion {conversion:.0f}%, EBITDA margin swing {swing:.1f} pp"
 SCORE_REASON_TREND = "EBITDA CAGR {ebitda:+.1f}%, revenue CAGR {revenue:+.1f}%"
+SCORE_REASON_SCALE = "Adjusted EBITDA EUR {ebitda:.1f}m, EBITDA margin {margin:.1f}%"
 SCORE_REASON_GOVERNANCE = "{high} high and {medium} medium red flags"
 SCORE_REASON_DATA = "complete, {verified} of {total} quotes verified"
 SCORE_REASON_DATA_NO_QUOTES = "complete, no AI text to verify"

@@ -50,14 +50,21 @@ LBO_MIN_SPONSOR_EQUITY_PCT = 0.30  # Minimale inbreng van de sponsor (deel van p
 
 # Scorecard 0-100 (scorecard.py). Elke component scoort lineair tussen de 0-drempel en de 100-drempel.
 # Startwaarden: ijk ze op een reeks bedrijven (stap 5.6). De gewichten tellen op tot 1.
+# IJking 1 nov 2026 op Cloudar, TRUSTTEAM, Flanders Food Productions, Aikido Security en Amadeus Holding
+# (rangorde van de analist: TRUSTTEAM > Cloudar > FFP > Aikido, Amadeus). Schaal en marge kregen een eigen
+# component: een PE-fonds screent eerst daarop. De prijsruimte weegt minder, want ze meet ook de vraagprijs
+# (tabelmultiple) en niet alleen de kwaliteit van het bedrijf.
 SCORE_GEWICHTEN = {
-	"debt_capacity": 0.25,
-	"headroom": 0.20,
-	"cashflow": 0.20,
+	"debt_capacity": 0.20,
+	"headroom": 0.10,
+	"cashflow": 0.15,
 	"trend": 0.15,
+	"scale": 0.20,
 	"governance": 0.10,
 	"data": 0.10,
 }
+SCORE_EBITDA_EUR = (1_000_000.0, 10_000_000.0)  # Adjusted EBITDA: 0 punten, 100 punten
+SCORE_EBITDA_MARGE_PCT = (5.0, 25.0)            # EBITDA-marge (op omzet of brutomarge): 0, 100
 SCORE_DEBT_CAPACITY = (0.5, 3.0)        # x EBITDA (Screening Stress): 0 punten, 100 punten
 SCORE_HEADROOM_PCT = (-30.0, 20.0)      # Max EV (doel-IRR) tegenover de indicatieve EV
 SCORE_CASH_CONVERSIE_PCT = (50.0, 90.0) # (EBITDA - capex) / EBITDA, gemiddeld over de historiek

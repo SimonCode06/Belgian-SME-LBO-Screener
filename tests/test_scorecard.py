@@ -28,7 +28,7 @@ def test_weights_add_up_to_one():
 	assert sum(config.SCORE_GEWICHTEN.values()) == pytest.approx(1.0)
 
 
-def test_score_has_six_explained_components(rij):
+def test_score_has_seven_explained_components(rij):
 	lijst = rij["Score_Componenten"]
 	assert [c["sleutel"] for c in lijst] == list(config.SCORE_GEWICHTEN)
 	assert all(0 <= c["score"] <= 100 and c["reden"] for c in lijst)

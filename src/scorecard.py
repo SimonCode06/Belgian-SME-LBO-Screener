@@ -70,7 +70,7 @@ def componenten(rij):
 	conversie, schommeling = _getal(rij.get("Hist_Cash_Conversion_Pct")), _getal(rij.get("Hist_Marge_Schommeling_pp"))
 	voeg(
 		"cashflow",
-		min(lineair(conversie, *config.SCORE_CASH_CONVERSIE_PCT), lineair(schommeling, *config.SCORE_MARGE_SCHOMMELING_PP)),
+		(lineair(conversie, *config.SCORE_CASH_CONVERSIE_PCT) + lineair(schommeling, *config.SCORE_MARGE_SCHOMMELING_PP)) / 2,
 		labels.SCORE_REASON_CASHFLOW.format(conversion=conversie, swing=schommeling),
 	)
 
@@ -80,6 +80,13 @@ def componenten(rij):
 		"trend",
 		w * lineair(ebitda_cagr, *config.SCORE_CAGR_PCT) + (1 - w) * lineair(omzet_cagr, *config.SCORE_CAGR_PCT),
 		labels.SCORE_REASON_TREND.format(ebitda=ebitda_cagr, revenue=omzet_cagr),
+	)
+
+	ebitda, marge = _getal(rij.get("Genormaliseerde_EBITDA")), _getal(rij.get("Driver_EBITDA_Marge_Pct"))
+	voeg(
+		"scale",
+		(lineair(ebitda, *config.SCORE_EBITDA_EUR) + lineair(marge, *config.SCORE_EBITDA_MARGE_PCT)) / 2,
+		labels.SCORE_REASON_SCALE.format(ebitda=0.0 if math.isnan(ebitda) else ebitda / 1e6, margin=marge),
 	)
 
 	hoog, middel = int(rij.get("Aantal_Hoge_Vlaggen", 0)), int(rij.get("Aantal_Middel_Vlaggen", 0))
