@@ -264,14 +264,16 @@ def _integriteitstesten(jaren, bronnen, bestedingen, minimum_cash):
 	senior = jaren[0]["Senior_Lening"]
 	rcf = jaren[0]["RCF"]
 	eigen_vermogen = jaren[0]["Eigen_Vermogen"]
-	afwijking_schuld = abs(jaren[0]["Vendor_Loan"] - forecast[-1]["Vendor_Loan"])
+	vendor = jaren[0]["Vendor_Loan"]
+	afwijking_schuld = 0.0
 	afwijking_eigen_vermogen = 0.0
 	for jaar in forecast:
 		senior -= jaar["Verplichte_Aflossing"] + jaar["Cash_Sweep"]
 		rcf += jaar["RCF_Opname"] - jaar["RCF_Aflossing"]
+		vendor += jaar["PIK_Rente"]  # zonder PIK blijft de vendor loan gelijk tot de exit
 		eigen_vermogen += jaar["Nettowinst"] - jaar["Dividend"]
 		afwijking_schuld = max(
-			afwijking_schuld, abs(senior - jaar["Senior_Lening"]), abs(rcf - jaar["RCF"])
+			afwijking_schuld, abs(senior - jaar["Senior_Lening"]), abs(rcf - jaar["RCF"]), abs(vendor - jaar["Vendor_Loan"])
 		)
 		afwijking_eigen_vermogen = max(afwijking_eigen_vermogen, abs(eigen_vermogen - jaar["Eigen_Vermogen"]))
 
@@ -504,7 +506,9 @@ def bereken_lbo(rij, scenario="base"):
 			winst_voor_belasting = ebit - rente - kosten_afschrijving + rente_opbrengst
 			nettowinst = winst_voor_belasting - belasting
 
-			fcf = ebitda - belasting - capex - delta_twc - delta_overig - rente + rente_opbrengst
+			# PIK: de rente op de vendor loan wordt gekapitaliseerd en verlaat de waterval niet
+			pik = rente_vendor if config.LBO_VENDOR_LOAN_PIK else 0.0
+			fcf = ebitda - belasting - capex - delta_twc - delta_overig - (rente - pik) + rente_opbrengst
 			verplichte_aflossing = min(senior, senior_0 / config.LBO_SENIOR_LOOPTIJD_JAAR * fractie)
 			excess_cash_flow = fcf - verplichte_aflossing
 
@@ -530,6 +534,7 @@ def bereken_lbo(rij, scenario="base"):
 				"Rente_RCF": rente_rcf,
 				"Commitment_Fee": commitment_fee,
 				"Rente_Vendor": rente_vendor,
+				"PIK_Rente": pik,
 				"Rente": rente,
 				"Rente_Opbrengst": rente_opbrengst,
 				"Belasting": belasting,
@@ -566,13 +571,14 @@ def bereken_lbo(rij, scenario="base"):
 			posten_begin,
 			posten,
 			ronde["Nettowinst"],
-			afschrijvingen + goodwill_afschrijving + kosten_afschrijving,
+			afschrijvingen + goodwill_afschrijving + kosten_afschrijving + ronde["PIK_Rente"],
 			capex,
 			ronde["RCF_Opname"] - ronde["RCF_Aflossing"] - ronde["Verplichte_Aflossing"] - ronde["Cash_Sweep"],
 			ronde["Dividend"],
 		)
 
 		senior_begin, rcf_begin = senior, rcf
+		vendor = vendor + ronde["PIK_Rente"]
 		cash = cash + kasstroom["KS_Netto"]
 		senior = senior_eind
 		rcf = rcf_eind

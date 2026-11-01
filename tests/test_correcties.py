@@ -298,3 +298,40 @@ def test_vendor_loan_counts_in_the_icr_when_not_subordinated(cijfers, monkeypatc
 	assert jaar["Rentedekking"] == pytest.approx(
 		jaar["EBITDA"] / (jaar["Rente_Senior"] + jaar["Rente_RCF"] + jaar["Commitment_Fee"] + jaar["Rente_Vendor"])
 	)
+
+
+# --- 3.7 Vendor loan as PIK ---------------------------------------------------------------
+
+
+def test_pik_interest_accrues_and_stays_out_of_the_waterfall(cijfers):
+	model = bouw_dataframe([cijfers]).iloc[0]["LBO_Scenarios"]["base"]
+	jaren = model["Jaren"]
+	vendor_0 = jaren[0]["Vendor_Loan"]
+	assert jaren[-1]["Vendor_Loan"] == pytest.approx(vendor_0 * (1 + config.LBO_VENDOR_LOAN_RENTE) ** 5)
+	jaar = jaren[1]
+	assert jaar["PIK_Rente"] == pytest.approx(vendor_0 * config.LBO_VENDOR_LOAN_RENTE)
+	cash_rente = jaar["Rente"] - jaar["PIK_Rente"]
+	assert jaar["FCF"] == pytest.approx(
+		jaar["EBITDA"] - jaar["Belasting"] - jaar["Capex"] - jaar["Delta_TWC"] - jaar["Delta_Overig"] - cash_rente
+		+ jaar["Rente_Opbrengst"]
+	)
+	assert model["LBO_Balanscheck"] == labels.CHECK_OK
+	# The exit net debt includes the accrued interest
+	assert model["LBO_Eind_Net_Debt_Jaar5"] >= jaren[-1]["Vendor_Loan"] - jaren[-1]["Cash"] - 1
+
+
+def test_pik_interest_stays_tax_deductible(cijfers, monkeypatch):
+	monkeypatch.setattr(config, "LBO_RENTEAFTREK_VANAF_JAAR", 1)
+	jaar = bouw_dataframe([cijfers]).iloc[0]["LBO_Scenarios"]["base"]["Jaren"][1]
+	assert jaar["Nettowinst"] == pytest.approx(jaar["Winst_Voor_Belasting"] - jaar["Belasting"])
+	monkeypatch.setattr(config, "LBO_VENDOR_LOAN_RENTE", 0.0)
+	zonder = bouw_dataframe([cijfers]).iloc[0]["LBO_Scenarios"]["base"]["Jaren"][1]
+	assert jaar["Belasting"] < zonder["Belasting"]
+
+
+def test_cash_paying_vendor_loan_when_pik_is_off(cijfers, monkeypatch):
+	monkeypatch.setattr(config, "LBO_VENDOR_LOAN_PIK", False)
+	model = bouw_dataframe([cijfers]).iloc[0]["LBO_Scenarios"]["base"]
+	assert model["Jaren"][-1]["Vendor_Loan"] == pytest.approx(model["Jaren"][0]["Vendor_Loan"])
+	assert all(jaar["PIK_Rente"] == 0.0 for jaar in model["Jaren"][1:])
+	assert model["LBO_Balanscheck"] == labels.CHECK_OK

@@ -43,7 +43,11 @@ LBO_SENIOR_RENTE = 0.065         # Rente op de amortiserende senior lening (6,5%
 LBO_SENIOR_LOOPTIJD_JAAR = 7     # Lineaire aflossing van de senior lening
 LBO_CASH_SWEEP_PCT = 0.50        # Deel van de excess cash flow van het jaar dat extra aflost op de senior lening
 LBO_VENDOR_LOAN_PCT_EV = 0.10    # Vendor loan als deel van de EV, in één keer terugbetaald bij exit
-LBO_VENDOR_LOAN_RENTE = 0.08     # Rente op de vendor loan, jaarlijks in cash betaald
+LBO_VENDOR_LOAN_RENTE = 0.08     # Rente op de vendor loan
+# PIK (payment in kind): de rente wordt bij het saldo gekapitaliseerd en samen met de hoofdsom bij exit
+# terugbetaald. Ze blijft fiscaal aftrekbaar (binnen de renteaftrekbeperking), maar verlaat de waterval niet.
+# False: de rente wordt elk jaar in cash betaald.
+LBO_VENDOR_LOAN_PIK = True
 LBO_RCF_LIMIET_X_EBITDA = 0.5    # Limiet van de RCF: vast bedrag bij closing, als veelvoud van de EBITDA (bij closing niet getrokken)
 LBO_RCF_RENTE = 0.065            # Rente op het getrokken deel, zoals de senior lening
 LBO_RCF_COMMITMENT_FEE = 0.01    # Jaarlijkse vergoeding op het niet-getrokken deel van de limiet
