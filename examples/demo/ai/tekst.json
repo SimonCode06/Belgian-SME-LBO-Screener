@@ -1,0 +1,59 @@
+{
+  "ondernemingsnummer": "0999.999.999",
+  "boekjaar": "2024",
+  "commissaris_oordeel": "Unqualified",
+  "normalisaties": [
+    {
+      "categorie": "bestuurdersvergoeding",
+      "omschrijving": "Remuneration of the two founder-directors, above what a hired CEO and CFO would cost.",
+      "bedrag_eur": 380000.0,
+      "nbb_code": "9503",
+      "richting": "+",
+      "pagina": 12,
+      "citaat": "Aan bestuurders en zaakvoerders 9503 380.000",
+      "confidence": "high"
+    },
+    {
+      "categorie": "huur_verbonden_partij",
+      "omschrijving": "The plant is rented from a property company of the founders, at an estimated EUR 90k above market rent.",
+      "bedrag_eur": 90000.0,
+      "nbb_code": null,
+      "richting": "+",
+      "pagina": 9,
+      "citaat": "Huur van het bedrijfsgebouw aan Demo Vastgoed BV",
+      "confidence": "low"
+    }
+  ],
+  "red_flags": [
+    {
+      "categorie": "klantconcentratie",
+      "ernst": "middel",
+      "omschrijving": "The three largest customers are about 45% of revenue.",
+      "pagina": 6,
+      "citaat": "de drie grootste klanten vertegenwoordigen circa 45% van de omzet"
+    },
+    {
+      "categorie": "personeel",
+      "ernst": "laag",
+      "omschrijving": "Both founders run sales and engineering; no second management layer is mentioned.",
+      "pagina": 4,
+      "citaat": "de zaakvoerders leiden zelf de commerciële en technische afdeling"
+    }
+  ],
+  "eigendom": {
+    "type": "zelfstandig",
+    "moederonderneming": null,
+    "ondernemingsnummer_moeder": null,
+    "consoliderend": "nee",
+    "pagina": 3,
+    "citaat": "De vennootschap is niet opgenomen in een consolidatie"
+  },
+  "buitenbalans": [
+    {
+      "omschrijving": "Operating leases for vehicles and forklifts",
+      "bedrag_eur": 420000.0,
+      "pagina": 11
+    }
+  ],
+  "Gebruikt_Model": "demo (illustrative, no AI call)"
+}

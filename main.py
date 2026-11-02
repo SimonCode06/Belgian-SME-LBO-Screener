@@ -21,7 +21,7 @@ import pandas as pd
 from google import genai
 from google.genai import types
 
-from src import assumpties, citaten, config, labels, normalisaties
+from src import assumpties, citaten, config, demo, labels, normalisaties
 from src.ai_extraction import (
 	analyseer_tekst,
 	bouw_assumptie_prompt,
@@ -255,8 +255,11 @@ def koppel_tekst(cijfers, tekst, codes=None, paginas=None):
 	return velden
 
 
-def voeg_oordelen_toe(df, client, mislukt):
-	"""Tweede pass: Gemini licht per bedrijf de uitkomst van het model toe, met these en DD-vragen."""
+def voeg_oordelen_toe(df, client, mislukt, vast_oordeel=None):
+	"""Tweede pass: Gemini licht per bedrijf de uitkomst van het model toe, met these en DD-vragen.
+
+	vast_oordeel: een vast antwoord in plaats van Gemini (de demo).
+	"""
 	toelichtingen, theses, vragen = [], [], []
 	for index, rij in df.iterrows():
 		toelichtingen.append(rij["Kwalitatief_LBO_Oordeel"])
@@ -269,8 +272,10 @@ def voeg_oordelen_toe(df, client, mislukt):
 			continue
 
 		cache_pad = oordeel_cache_pad_voor(rij)
-		oordeel = lees_cache(cache_pad, OordeelAntwoord)
-		if oordeel is not None:
+		oordeel = vast_oordeel or lees_cache(cache_pad, OordeelAntwoord)
+		if vast_oordeel is not None:
+			print("   -> Demo: illustratieve toelichting")
+		elif oordeel is not None:
 			print("   -> Toelichting uit cache")
 		elif client is None:
 			oordeel = {"kwalitatief_lbo_oordeel": labels.COMMENTARY_NO_GEMINI}
@@ -304,6 +309,11 @@ def lees_argumenten(argv=None):
 		"--vernieuw-assumpties",
 		action="store_true",
 		help="Laat Gemini nieuwe assumpties maken; de bestaande snapshots in assumpties/ worden gearchiveerd.",
+	)
+	parser.add_argument(
+		"--demo",
+		action="store_true",
+		help="Draai het fictieve demobedrijf uit examples/demo, zonder API-sleutel; de output komt in output/demo/.",
 	)
 	parser.add_argument(
 		"--ijking",
@@ -348,6 +358,10 @@ def schrijf_ijking(df, run_naam):
 def main(argv=None):
 	argumenten = lees_argumenten(argv)
 	run_naam = manifest_naam()
+	demo_tekst = demo_oordeel = None
+	if argumenten.demo:
+		print(f"Demo: fictief bedrijf uit examples/demo, output in {demo.bereid_voor()}")
+		demo_tekst, demo_oordeel = demo.tekst(), demo.oordeel()
 	config.INPUT_FOLDER.mkdir(exist_ok=True)
 	config.CACHE_FOLDER.mkdir(exist_ok=True)
 	config.OUTPUT_FOLDER.mkdir(exist_ok=True)
@@ -369,7 +383,7 @@ def main(argv=None):
 
 	bedrijven = groepeer_per_bedrijf(neerleggingen)
 	gebruikte_pdfs = set()
-	client = maak_client() if pdf_per_naam else None
+	client = maak_client() if pdf_per_naam and not argumenten.demo else None
 
 	print(f"Start LBO-analyse voor {len(bedrijven)} bedrijf/bedrijven...")
 	resultaten, meerjaren, invoer_per_bedrijf = [], {}, {}
@@ -383,7 +397,10 @@ def main(argv=None):
 		pdf = zoek_pdf(bedrijf, pdf_per_naam)
 		paginas = citaten.pdf_paginas(pdf)  # PDF-tekst per pagina, voor de citaatcontrole
 
-		if pdf is None:
+		if pdf is None and demo_tekst is not None:
+			tekst = dict(demo_tekst)
+			print("   -> Demo: illustratieve tekstanalyse (geen PDF, geen AI)")
+		elif pdf is None:
 			tekst = geen_tekst(labels.TEXT_NO_PDF)
 			print("   -> Geen PDF gevonden, alleen cijfers")
 		else:
@@ -455,7 +472,7 @@ def main(argv=None):
 
 	if resultaten:
 		df = bouw_dataframe(resultaten)
-		voeg_oordelen_toe(df, client, mislukt)
+		voeg_oordelen_toe(df, client, mislukt, demo_oordeel)
 		df["Run_Manifest"] = run_naam  # in the footer of every workbook
 
 		overzicht_pad = schrijf_overzicht(df)

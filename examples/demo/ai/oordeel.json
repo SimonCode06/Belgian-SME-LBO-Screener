@@ -1,0 +1,31 @@
+{
+  "kwalitatief_lbo_oordeel": "Fictitious demo text. A growing, cash-generative family business with a clean balance sheet and no financial debt. The bank tests hold at about 2.2x senior in the stress case, but the indicative price leaves little headroom at a 20% IRR, so the case depends on the price and on how much of the founders' role can be replaced.",
+  "investment_thesis": [
+    "Revenue grew about 10% a year with a rising EBITDA margin (16% to 18%): operating leverage on an existing plant.",
+    "No financial debt and EUR 3.2m cash: room for about 2.2x senior debt that the stress case still services.",
+    "Founder-owned with no group ties (Primary deal): a clean succession buy-out with a vendor loan."
+  ],
+  "dd_vragen": [
+    {
+      "vraag": "What are the contract terms and renewal dates of the three largest customers, and is there a change-of-control clause?",
+      "gekoppeld_aan": "Customer concentration"
+    },
+    {
+      "vraag": "What would a hired CEO and CFO cost, and will the founders stay on after closing?",
+      "gekoppeld_aan": "Director remuneration adjustment"
+    },
+    {
+      "vraag": "What is the market rent of the plant, and can a long lease at that rent be signed before closing?",
+      "gekoppeld_aan": "Related-party rent"
+    },
+    {
+      "vraag": "Which part of the 2024 growth comes from the new production line, and what is its order backlog?",
+      "gekoppeld_aan": "Volume growth assumption"
+    },
+    {
+      "vraag": "Is the 2024 non-recurring cost of EUR 180k truly one-off?",
+      "gekoppeld_aan": "Non-recurring expenses (66A)"
+    }
+  ],
+  "Gebruikt_Model": "demo (illustrative, no AI call)"
+}
