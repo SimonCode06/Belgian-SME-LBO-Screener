@@ -1,8 +1,8 @@
 {
-  "kwalitatief_lbo_oordeel": "Fictitious demo text. A growing, cash-generative family business with a clean balance sheet and no financial debt. The bank tests hold at about 2.2x senior in the stress case, but the indicative price leaves little headroom at a 20% IRR, so the case depends on the price and on how much of the founders' role can be replaced.",
+  "kwalitatief_lbo_oordeel": "Fictitious demo text. A growing, cash-generative family business with a clean balance sheet and no financial debt. The bank tests hold up to about 2.7x senior debt in the stress case, below the 3.4x market structure, and the indicative price is slightly above what a 20% IRR allows, so the case depends on the price, the debt quantum and how much of the founders' role can be replaced.",
   "investment_thesis": [
     "Revenue grew about 10% a year with a rising EBITDA margin (16% to 18%): operating leverage on an existing plant.",
-    "No financial debt and EUR 3.2m cash: room for about 2.2x senior debt that the stress case still services.",
+    "No financial debt and EUR 3.2m cash: room for about 2.7x senior debt that the stress case still services.",
     "Founder-owned with no group ties (Primary deal): a clean succession buy-out with a vendor loan."
   ],
   "dd_vragen": [
