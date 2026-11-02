@@ -1,0 +1,31 @@
+{
+  "bedrijf": "Demo Industries NV",
+  "items": [
+    {
+      "id": "A1",
+      "categorie": "bestuurdersvergoeding",
+      "omschrijving": "Remuneration of the two founder-directors, above what a hired CEO and CFO would cost.",
+      "richting": "+",
+      "bedrag": 380000.0,
+      "bron": "CSV code 9503",
+      "bedrag_geverifieerd": true,
+      "pagina": 12,
+      "citaat_status": "not checkable",
+      "market_level": 250000.0,
+      "goedgekeurd": true
+    },
+    {
+      "id": "A2",
+      "categorie": "huur_verbonden_partij",
+      "omschrijving": "The plant is rented from a property company of the founders, at an estimated EUR 90k above market rent.",
+      "richting": "+",
+      "bedrag": 90000.0,
+      "bron": "AI, to be verified",
+      "bedrag_geverifieerd": false,
+      "pagina": 9,
+      "citaat_status": "not checkable",
+      "market_level": null,
+      "goedgekeurd": false
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 api_key.txt
-cache_json/
-input_pdfs/
-output/
+/cache_json/
+/input_pdfs/
+/output/
 __pycache__/
 *.pyc
 .pytest_cache/
@@ -10,4 +10,4 @@ __pycache__/
 tests/baseline_local/
 .coverage
 htmlcov/
-assumpties/
+/assumpties/

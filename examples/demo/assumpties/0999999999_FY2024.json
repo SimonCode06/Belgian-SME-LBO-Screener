@@ -1,0 +1,521 @@
+{
+  "metadata": {
+    "bedrijf": "Demo Industries NV",
+    "status": "voorstel",
+    "datum": "2026-11-02T10:00:00",
+    "gemini_model": "demo (illustrative, no AI call)",
+    "prompt_versie": "2026-11-b",
+    "schema_versie": 2,
+    "pdf_bestand": null,
+    "pdf_sha256": null
+  },
+  "assumpties": {
+    "regels": [
+      {
+        "scenario": "base",
+        "driver": "prijsgroei",
+        "waarden": [
+          2.5,
+          2.5,
+          2.0,
+          2.0,
+          2.0
+        ],
+        "rationale": "Price increases in line with the last two years and indexed contracts.",
+        "source": "p. 5: \"prijsherziening op basis van de index\"",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "base",
+        "driver": "volumegroei",
+        "waarden": [
+          5.0,
+          4.5,
+          4.0,
+          3.5,
+          3.0
+        ],
+        "rationale": "Volume growth slows from 7% towards market growth as the new line matures.",
+        "source": "p. 5: \"nieuwe productielijn in gebruik genomen\"",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "base",
+        "driver": "loonindexering",
+        "waarden": [
+          3.0,
+          2.5,
+          2.2,
+          2.0,
+          2.0
+        ],
+        "rationale": "Belgian automatic wage indexation, slightly above inflation in year 1.",
+        "source": "historical trend",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "base",
+        "driver": "vte_elasticiteit",
+        "waarden": [
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6
+        ],
+        "rationale": "Headcount grows at about 60% of volume: operating leverage on the existing plant.",
+        "source": "historical trend",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "base",
+        "driver": "inkoop_pct",
+        "waarden": [
+          45.0,
+          45.0,
+          44.8,
+          44.6,
+          44.5
+        ],
+        "rationale": "Stable gross margin; small purchasing gains from the scale of the new line.",
+        "source": "historical trend",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "base",
+        "driver": "overige_kosten_pct",
+        "waarden": [
+          8.3,
+          8.2,
+          8.1,
+          8.0,
+          8.0
+        ],
+        "rationale": "Other opex as a share of revenue keeps falling slowly with scale.",
+        "source": "historical trend",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "base",
+        "driver": "da_pct",
+        "waarden": [
+          12.0,
+          12.0,
+          12.0,
+          12.0,
+          12.0
+        ],
+        "rationale": "D&A at the historical rate on opening PP&E.",
+        "source": "historical trend",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "base",
+        "driver": "capex_pct",
+        "waarden": [
+          2.1,
+          2.1,
+          2.0,
+          2.0,
+          2.0
+        ],
+        "rationale": "Maintenance capex close to D&A after the line investment of 2024.",
+        "source": "p. 7: \"investeringen in materiële vaste activa\"",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "base",
+        "driver": "dso",
+        "waarden": [
+          58.0,
+          58.0,
+          57.0,
+          57.0,
+          56.0
+        ],
+        "rationale": "Customer terms unchanged; slight improvement from factoring discipline.",
+        "source": "historical trend",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "base",
+        "driver": "dio",
+        "waarden": [
+          33.0,
+          33.0,
+          33.0,
+          32.0,
+          32.0
+        ],
+        "rationale": "Inventory days stable.",
+        "source": "historical trend",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "base",
+        "driver": "dpo",
+        "waarden": [
+          47.0,
+          47.0,
+          47.0,
+          47.0,
+          47.0
+        ],
+        "rationale": "Supplier terms stable.",
+        "source": "historical trend",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "base",
+        "driver": "dagen_vooruitbetaling",
+        "waarden": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rationale": "No customer prepayments in this business.",
+        "source": "historical trend",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "downside",
+        "driver": "prijsgroei",
+        "waarden": [
+          1.75,
+          1.75,
+          1.25,
+          1.25,
+          1.25
+        ],
+        "rationale": "Downside: price increases in line with the last two years and indexed contracts.",
+        "source": "p. 5: \"prijsherziening op basis van de index\"",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "downside",
+        "driver": "volumegroei",
+        "waarden": [
+          2.5,
+          2.0,
+          1.5,
+          1.0,
+          0.5
+        ],
+        "rationale": "Downside: volume growth slows from 7% towards market growth as the new line matures.",
+        "source": "p. 5: \"nieuwe productielijn in gebruik genomen\"",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "downside",
+        "driver": "loonindexering",
+        "waarden": [
+          3.5,
+          3.0,
+          2.7,
+          2.5,
+          2.5
+        ],
+        "rationale": "Downside: belgian automatic wage indexation, slightly above inflation in year 1.",
+        "source": "historical trend",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "downside",
+        "driver": "vte_elasticiteit",
+        "waarden": [
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6
+        ],
+        "rationale": "Downside: headcount grows at about 60% of volume: operating leverage on the existing plant.",
+        "source": "historical trend",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "downside",
+        "driver": "inkoop_pct",
+        "waarden": [
+          45.75,
+          45.75,
+          45.55,
+          45.35,
+          45.25
+        ],
+        "rationale": "Downside: stable gross margin; small purchasing gains from the scale of the new line.",
+        "source": "historical trend",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "downside",
+        "driver": "overige_kosten_pct",
+        "waarden": [
+          8.6,
+          8.5,
+          8.4,
+          8.3,
+          8.3
+        ],
+        "rationale": "Downside: other opex as a share of revenue keeps falling slowly with scale.",
+        "source": "historical trend",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "downside",
+        "driver": "da_pct",
+        "waarden": [
+          12.0,
+          12.0,
+          12.0,
+          12.0,
+          12.0
+        ],
+        "rationale": "Downside: d&A at the historical rate on opening PP&E.",
+        "source": "historical trend",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "downside",
+        "driver": "capex_pct",
+        "waarden": [
+          2.4,
+          2.4,
+          2.3,
+          2.3,
+          2.3
+        ],
+        "rationale": "Downside: maintenance capex close to D&A after the line investment of 2024.",
+        "source": "p. 7: \"investeringen in materiële vaste activa\"",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "downside",
+        "driver": "dso",
+        "waarden": [
+          61.0,
+          61.0,
+          60.0,
+          60.0,
+          59.0
+        ],
+        "rationale": "Downside: customer terms unchanged; slight improvement from factoring discipline.",
+        "source": "historical trend",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "downside",
+        "driver": "dio",
+        "waarden": [
+          35.0,
+          35.0,
+          35.0,
+          34.0,
+          34.0
+        ],
+        "rationale": "Downside: inventory days stable.",
+        "source": "historical trend",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "downside",
+        "driver": "dpo",
+        "waarden": [
+          45.0,
+          45.0,
+          45.0,
+          45.0,
+          45.0
+        ],
+        "rationale": "Downside: supplier terms stable.",
+        "source": "historical trend",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "downside",
+        "driver": "dagen_vooruitbetaling",
+        "waarden": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rationale": "Downside: no customer prepayments in this business.",
+        "source": "historical trend",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "upside",
+        "driver": "prijsgroei",
+        "waarden": [
+          3.25,
+          3.25,
+          2.75,
+          2.75,
+          2.75
+        ],
+        "rationale": "Upside: price increases in line with the last two years and indexed contracts.",
+        "source": "p. 5: \"prijsherziening op basis van de index\"",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "upside",
+        "driver": "volumegroei",
+        "waarden": [
+          7.5,
+          7.0,
+          6.5,
+          6.0,
+          5.5
+        ],
+        "rationale": "Upside: volume growth slows from 7% towards market growth as the new line matures.",
+        "source": "p. 5: \"nieuwe productielijn in gebruik genomen\"",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "upside",
+        "driver": "loonindexering",
+        "waarden": [
+          2.5,
+          2.0,
+          1.7,
+          1.5,
+          1.5
+        ],
+        "rationale": "Upside: belgian automatic wage indexation, slightly above inflation in year 1.",
+        "source": "historical trend",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "upside",
+        "driver": "vte_elasticiteit",
+        "waarden": [
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6
+        ],
+        "rationale": "Upside: headcount grows at about 60% of volume: operating leverage on the existing plant.",
+        "source": "historical trend",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "upside",
+        "driver": "inkoop_pct",
+        "waarden": [
+          44.25,
+          44.25,
+          44.05,
+          43.85,
+          43.75
+        ],
+        "rationale": "Upside: stable gross margin; small purchasing gains from the scale of the new line.",
+        "source": "historical trend",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "upside",
+        "driver": "overige_kosten_pct",
+        "waarden": [
+          8.0,
+          7.9,
+          7.8,
+          7.7,
+          7.7
+        ],
+        "rationale": "Upside: other opex as a share of revenue keeps falling slowly with scale.",
+        "source": "historical trend",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "upside",
+        "driver": "da_pct",
+        "waarden": [
+          12.0,
+          12.0,
+          12.0,
+          12.0,
+          12.0
+        ],
+        "rationale": "Upside: d&A at the historical rate on opening PP&E.",
+        "source": "historical trend",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "upside",
+        "driver": "capex_pct",
+        "waarden": [
+          1.8,
+          1.8,
+          1.7,
+          1.7,
+          1.7
+        ],
+        "rationale": "Upside: maintenance capex close to D&A after the line investment of 2024.",
+        "source": "p. 7: \"investeringen in materiële vaste activa\"",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "upside",
+        "driver": "dso",
+        "waarden": [
+          55.0,
+          55.0,
+          54.0,
+          54.0,
+          53.0
+        ],
+        "rationale": "Upside: customer terms unchanged; slight improvement from factoring discipline.",
+        "source": "historical trend",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "upside",
+        "driver": "dio",
+        "waarden": [
+          31.0,
+          31.0,
+          31.0,
+          30.0,
+          30.0
+        ],
+        "rationale": "Upside: inventory days stable.",
+        "source": "historical trend",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "upside",
+        "driver": "dpo",
+        "waarden": [
+          49.0,
+          49.0,
+          49.0,
+          49.0,
+          49.0
+        ],
+        "rationale": "Upside: supplier terms stable.",
+        "source": "historical trend",
+        "confidence": "medium"
+      },
+      {
+        "scenario": "upside",
+        "driver": "dagen_vooruitbetaling",
+        "waarden": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rationale": "Upside: no customer prepayments in this business.",
+        "source": "historical trend",
+        "confidence": "medium"
+      }
+    ],
+    "business_model": "Fictitious: makes and installs industrial packaging lines for Belgian food producers, sold per project with multi-year service contracts."
+  }
+}
