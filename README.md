@@ -1,4 +1,4 @@
-# LBO Feasibility Analyser
+# Belgian SME LBO Screener 
 
 [![tests](https://github.com/SimonCode06/LBO_Project/actions/workflows/tests.yml/badge.svg)](https://github.com/SimonCode06/LBO_Project/actions/workflows/tests.yml)
 
